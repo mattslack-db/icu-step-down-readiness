@@ -1,0 +1,1863 @@
+{
+  "patients": {
+    "table_name": "patients",
+    "columns": [
+      {
+        "name": "ROW_ID",
+        "pg_type": "int4",
+        "databricks_type": "INT",
+        "comment": "Unique row identifier."
+      },
+      {
+        "name": "SUBJECT_ID",
+        "pg_type": "int4",
+        "databricks_type": "INT",
+        "comment": "Primary key. Identifies the patient."
+      },
+      {
+        "name": "GENDER",
+        "pg_type": "varchar",
+        "databricks_type": "STRING",
+        "comment": "Gender."
+      },
+      {
+        "name": "DOB",
+        "pg_type": "timestamp",
+        "databricks_type": "TIMESTAMP",
+        "comment": "Date of birth."
+      },
+      {
+        "name": "DOD",
+        "pg_type": "timestamp",
+        "databricks_type": "TIMESTAMP",
+        "comment": "Date of death. Null if the patient was alive at least 90 days post hospital discharge."
+      },
+      {
+        "name": "DOD_HOSP",
+        "pg_type": "timestamp",
+        "databricks_type": "TIMESTAMP",
+        "comment": "Date of death recorded in the hospital records."
+      },
+      {
+        "name": "DOD_SSN",
+        "pg_type": "timestamp",
+        "databricks_type": "TIMESTAMP",
+        "comment": "Date of death recorded in the social security records."
+      },
+      {
+        "name": "EXPIRE_FLAG",
+        "pg_type": "int4",
+        "databricks_type": "INT",
+        "comment": "Flag indicating that the patient has died."
+      }
+    ]
+  },
+  "admissions": {
+    "table_name": "admissions",
+    "columns": [
+      {
+        "name": "ROW_ID",
+        "pg_type": "int4",
+        "databricks_type": "INT",
+        "comment": "Unique row identifier."
+      },
+      {
+        "name": "SUBJECT_ID",
+        "pg_type": "int4",
+        "databricks_type": "INT",
+        "comment": "Foreign key. Identifies the patient."
+      },
+      {
+        "name": "HADM_ID",
+        "pg_type": "int4",
+        "databricks_type": "INT",
+        "comment": "Primary key. Identifies the hospital stay."
+      },
+      {
+        "name": "ADMITTIME",
+        "pg_type": "timestamp",
+        "databricks_type": "TIMESTAMP",
+        "comment": "Time of admission to the hospital."
+      },
+      {
+        "name": "DISCHTIME",
+        "pg_type": "timestamp",
+        "databricks_type": "TIMESTAMP",
+        "comment": "Time of discharge from the hospital."
+      },
+      {
+        "name": "DEATHTIME",
+        "pg_type": "timestamp",
+        "databricks_type": "TIMESTAMP",
+        "comment": "Time of death."
+      },
+      {
+        "name": "ADMISSION_TYPE",
+        "pg_type": "varchar",
+        "databricks_type": "STRING",
+        "comment": "Type of admission, for example emergency or elective."
+      },
+      {
+        "name": "ADMISSION_LOCATION",
+        "pg_type": "varchar",
+        "databricks_type": "STRING",
+        "comment": "Admission location."
+      },
+      {
+        "name": "DISCHARGE_LOCATION",
+        "pg_type": "varchar",
+        "databricks_type": "STRING",
+        "comment": "Discharge location"
+      },
+      {
+        "name": "INSURANCE",
+        "pg_type": "varchar",
+        "databricks_type": "STRING",
+        "comment": "Insurance type."
+      },
+      {
+        "name": "LANGUAGE",
+        "pg_type": "varchar",
+        "databricks_type": "STRING",
+        "comment": "Language."
+      },
+      {
+        "name": "RELIGION",
+        "pg_type": "varchar",
+        "databricks_type": "STRING",
+        "comment": "Religon."
+      },
+      {
+        "name": "MARITAL_STATUS",
+        "pg_type": "varchar",
+        "databricks_type": "STRING",
+        "comment": "Marital status."
+      },
+      {
+        "name": "ETHNICITY",
+        "pg_type": "varchar",
+        "databricks_type": "STRING",
+        "comment": "Ethnicity."
+      },
+      {
+        "name": "EDREGTIME",
+        "pg_type": "timestamp",
+        "databricks_type": "TIMESTAMP",
+        "comment": ""
+      },
+      {
+        "name": "EDOUTTIME",
+        "pg_type": "timestamp",
+        "databricks_type": "TIMESTAMP",
+        "comment": ""
+      },
+      {
+        "name": "DIAGNOSIS",
+        "pg_type": "varchar",
+        "databricks_type": "STRING",
+        "comment": "Diagnosis."
+      },
+      {
+        "name": "HOSPITAL_EXPIRE_FLAG",
+        "pg_type": "int2",
+        "databricks_type": "SMALLINT",
+        "comment": ""
+      },
+      {
+        "name": "HAS_CHARTEVENTS_DATA",
+        "pg_type": "int2",
+        "databricks_type": "SMALLINT",
+        "comment": "Hospital admission has at least one observation in the CHARTEVENTS table."
+      }
+    ]
+  },
+  "icu_stays": {
+    "table_name": "icustays",
+    "columns": [
+      {
+        "name": "ROW_ID",
+        "pg_type": "int4",
+        "databricks_type": "INT",
+        "comment": "Unique row identifier."
+      },
+      {
+        "name": "SUBJECT_ID",
+        "pg_type": "int4",
+        "databricks_type": "INT",
+        "comment": "Foreign key. Identifies the patient."
+      },
+      {
+        "name": "HADM_ID",
+        "pg_type": "int4",
+        "databricks_type": "INT",
+        "comment": "Foreign key. Identifies the hospital stay."
+      },
+      {
+        "name": "ICUSTAY_ID",
+        "pg_type": "int4",
+        "databricks_type": "INT",
+        "comment": "Primary key. Identifies the ICU stay."
+      },
+      {
+        "name": "DBSOURCE",
+        "pg_type": "varchar",
+        "databricks_type": "STRING",
+        "comment": "Source database of the item."
+      },
+      {
+        "name": "FIRST_CAREUNIT",
+        "pg_type": "varchar",
+        "databricks_type": "STRING",
+        "comment": "First careunit associated with the ICU stay."
+      },
+      {
+        "name": "LAST_CAREUNIT",
+        "pg_type": "varchar",
+        "databricks_type": "STRING",
+        "comment": "Last careunit associated with the ICU stay."
+      },
+      {
+        "name": "FIRST_WARDID",
+        "pg_type": "int2",
+        "databricks_type": "SMALLINT",
+        "comment": "Identifier for the first ward the patient was located in."
+      },
+      {
+        "name": "LAST_WARDID",
+        "pg_type": "int2",
+        "databricks_type": "SMALLINT",
+        "comment": "Identifier for the last ward the patient is located in."
+      },
+      {
+        "name": "INTIME",
+        "pg_type": "timestamp",
+        "databricks_type": "TIMESTAMP",
+        "comment": "Time of admission to the ICU."
+      },
+      {
+        "name": "OUTTIME",
+        "pg_type": "timestamp",
+        "databricks_type": "TIMESTAMP",
+        "comment": "Time of discharge from the ICU."
+      },
+      {
+        "name": "LOS",
+        "pg_type": "float8",
+        "databricks_type": "DOUBLE",
+        "comment": "Length of stay in the ICU in fractional days."
+      }
+    ]
+  },
+  "transfers": {
+    "table_name": "transfers",
+    "columns": [
+      {
+        "name": "ROW_ID",
+        "pg_type": "int4",
+        "databricks_type": "INT",
+        "comment": "Unique row identifier."
+      },
+      {
+        "name": "SUBJECT_ID",
+        "pg_type": "int4",
+        "databricks_type": "INT",
+        "comment": "Foreign key. Identifies the patient."
+      },
+      {
+        "name": "HADM_ID",
+        "pg_type": "int4",
+        "databricks_type": "INT",
+        "comment": "Foreign key. Identifies the hospital stay."
+      },
+      {
+        "name": "ICUSTAY_ID",
+        "pg_type": "int4",
+        "databricks_type": "INT",
+        "comment": "Foreign key. Identifies the ICU stay."
+      },
+      {
+        "name": "DBSOURCE",
+        "pg_type": "varchar",
+        "databricks_type": "STRING",
+        "comment": "Source database of the item."
+      },
+      {
+        "name": "EVENTTYPE",
+        "pg_type": "varchar",
+        "databricks_type": "STRING",
+        "comment": "Type of event, for example admission or transfer."
+      },
+      {
+        "name": "PREV_CAREUNIT",
+        "pg_type": "varchar",
+        "databricks_type": "STRING",
+        "comment": "Previous careunit."
+      },
+      {
+        "name": "CURR_CAREUNIT",
+        "pg_type": "varchar",
+        "databricks_type": "STRING",
+        "comment": "Current careunit."
+      },
+      {
+        "name": "PREV_WARDID",
+        "pg_type": "int2",
+        "databricks_type": "SMALLINT",
+        "comment": "Identifier for the previous ward the patient was located in."
+      },
+      {
+        "name": "CURR_WARDID",
+        "pg_type": "int2",
+        "databricks_type": "SMALLINT",
+        "comment": "Identifier for the current ward the patient is located in."
+      },
+      {
+        "name": "INTIME",
+        "pg_type": "timestamp",
+        "databricks_type": "TIMESTAMP",
+        "comment": "Time when the patient was transferred into the unit."
+      },
+      {
+        "name": "OUTTIME",
+        "pg_type": "timestamp",
+        "databricks_type": "TIMESTAMP",
+        "comment": "Time when the patient was transferred out of the unit."
+      },
+      {
+        "name": "LOS",
+        "pg_type": "float8",
+        "databricks_type": "DOUBLE",
+        "comment": "Length of stay in the unit in minutes."
+      }
+    ]
+  },
+  "chart_events": {
+    "table_name": "chartevents",
+    "columns": [
+      {
+        "name": "ROW_ID",
+        "pg_type": "int4",
+        "databricks_type": "INT",
+        "comment": "Unique row identifier."
+      },
+      {
+        "name": "SUBJECT_ID",
+        "pg_type": "int4",
+        "databricks_type": "INT",
+        "comment": "Foreign key. Identifies the patient."
+      },
+      {
+        "name": "HADM_ID",
+        "pg_type": "int4",
+        "databricks_type": "INT",
+        "comment": "Foreign key. Identifies the hospital stay."
+      },
+      {
+        "name": "ICUSTAY_ID",
+        "pg_type": "int4",
+        "databricks_type": "INT",
+        "comment": "Foreign key. Identifies the ICU stay."
+      },
+      {
+        "name": "ITEMID",
+        "pg_type": "int4",
+        "databricks_type": "INT",
+        "comment": "Foreign key. Identifies the charted item."
+      },
+      {
+        "name": "CHARTTIME",
+        "pg_type": "timestamp",
+        "databricks_type": "TIMESTAMP",
+        "comment": "Time when the event occured."
+      },
+      {
+        "name": "STORETIME",
+        "pg_type": "timestamp",
+        "databricks_type": "TIMESTAMP",
+        "comment": "Time when the event was recorded in the system."
+      },
+      {
+        "name": "CGID",
+        "pg_type": "int4",
+        "databricks_type": "INT",
+        "comment": "Foreign key. Identifies the caregiver."
+      },
+      {
+        "name": "VALUE",
+        "pg_type": "varchar",
+        "databricks_type": "STRING",
+        "comment": "Value of the event as a text string."
+      },
+      {
+        "name": "VALUENUM",
+        "pg_type": "float8",
+        "databricks_type": "DOUBLE",
+        "comment": "Value of the event as a number."
+      },
+      {
+        "name": "VALUEUOM",
+        "pg_type": "varchar",
+        "databricks_type": "STRING",
+        "comment": "Unit of measurement."
+      },
+      {
+        "name": "WARNING",
+        "pg_type": "int4",
+        "databricks_type": "INT",
+        "comment": "Flag to highlight that the value has triggered a warning."
+      },
+      {
+        "name": "ERROR",
+        "pg_type": "int4",
+        "databricks_type": "INT",
+        "comment": "Flag to highlight an error with the event."
+      },
+      {
+        "name": "RESULTSTATUS",
+        "pg_type": "varchar",
+        "databricks_type": "STRING",
+        "comment": "Result status of lab data."
+      },
+      {
+        "name": "STOPPED",
+        "pg_type": "varchar",
+        "databricks_type": "STRING",
+        "comment": "Text string indicating the stopped status of an event (i.e. stopped, not stopped)."
+      }
+    ]
+  },
+  "lab_events": {
+    "table_name": "labevents",
+    "columns": [
+      {
+        "name": "ROW_ID",
+        "pg_type": "int4",
+        "databricks_type": "INT",
+        "comment": "Unique row identifier."
+      },
+      {
+        "name": "SUBJECT_ID",
+        "pg_type": "int4",
+        "databricks_type": "INT",
+        "comment": "Foreign key. Identifies the patient."
+      },
+      {
+        "name": "HADM_ID",
+        "pg_type": "int4",
+        "databricks_type": "INT",
+        "comment": "Foreign key. Identifies the hospital stay."
+      },
+      {
+        "name": "ITEMID",
+        "pg_type": "int4",
+        "databricks_type": "INT",
+        "comment": "Foreign key. Identifies the charted item."
+      },
+      {
+        "name": "CHARTTIME",
+        "pg_type": "timestamp",
+        "databricks_type": "TIMESTAMP",
+        "comment": "Time when the event occured."
+      },
+      {
+        "name": "VALUE",
+        "pg_type": "varchar",
+        "databricks_type": "STRING",
+        "comment": "Value of the event as a text string."
+      },
+      {
+        "name": "VALUENUM",
+        "pg_type": "float8",
+        "databricks_type": "DOUBLE",
+        "comment": "Value of the event as a number."
+      },
+      {
+        "name": "VALUEUOM",
+        "pg_type": "varchar",
+        "databricks_type": "STRING",
+        "comment": "Unit of measurement."
+      },
+      {
+        "name": "FLAG",
+        "pg_type": "varchar",
+        "databricks_type": "STRING",
+        "comment": "Flag indicating whether the lab test value is considered abnormal (null if the test was normal)."
+      }
+    ]
+  },
+  "microbiology_events": {
+    "table_name": "microbiologyevents",
+    "columns": [
+      {
+        "name": "ROW_ID",
+        "pg_type": "int4",
+        "databricks_type": "INT",
+        "comment": "Unique row identifier."
+      },
+      {
+        "name": "SUBJECT_ID",
+        "pg_type": "int4",
+        "databricks_type": "INT",
+        "comment": "Foreign key. Identifies the patient."
+      },
+      {
+        "name": "HADM_ID",
+        "pg_type": "int4",
+        "databricks_type": "INT",
+        "comment": "Foreign key. Identifies the hospital stay."
+      },
+      {
+        "name": "CHARTDATE",
+        "pg_type": "timestamp",
+        "databricks_type": "TIMESTAMP",
+        "comment": "Date when the event occured."
+      },
+      {
+        "name": "CHARTTIME",
+        "pg_type": "timestamp",
+        "databricks_type": "TIMESTAMP",
+        "comment": "Time when the event occured, if available."
+      },
+      {
+        "name": "SPEC_ITEMID",
+        "pg_type": "int4",
+        "databricks_type": "INT",
+        "comment": "Foreign key. Identifies the specimen."
+      },
+      {
+        "name": "SPEC_TYPE_DESC",
+        "pg_type": "varchar",
+        "databricks_type": "STRING",
+        "comment": "Description of the specimen."
+      },
+      {
+        "name": "ORG_ITEMID",
+        "pg_type": "int4",
+        "databricks_type": "INT",
+        "comment": "Foreign key. Identifies the organism."
+      },
+      {
+        "name": "ORG_NAME",
+        "pg_type": "varchar",
+        "databricks_type": "STRING",
+        "comment": "Name of the organism."
+      },
+      {
+        "name": "ISOLATE_NUM",
+        "pg_type": "int2",
+        "databricks_type": "SMALLINT",
+        "comment": "Isolate number associated with the test."
+      },
+      {
+        "name": "AB_ITEMID",
+        "pg_type": "int4",
+        "databricks_type": "INT",
+        "comment": "Foreign key. Identifies the antibody."
+      },
+      {
+        "name": "AB_NAME",
+        "pg_type": "varchar",
+        "databricks_type": "STRING",
+        "comment": "Name of the antibody used."
+      },
+      {
+        "name": "DILUTION_TEXT",
+        "pg_type": "varchar",
+        "databricks_type": "STRING",
+        "comment": "The dilution amount tested for and the comparison which was made against it (e.g. <=4)."
+      },
+      {
+        "name": "DILUTION_COMPARISON",
+        "pg_type": "varchar",
+        "databricks_type": "STRING",
+        "comment": "The comparison component of DILUTION_TEXT: either <= (less than or equal), = (equal), or >= (greater than or equal), or null when not available."
+      },
+      {
+        "name": "DILUTION_VALUE",
+        "pg_type": "float8",
+        "databricks_type": "DOUBLE",
+        "comment": "The value component of DILUTION_TEXT: must be a floating point number."
+      },
+      {
+        "name": "INTERPRETATION",
+        "pg_type": "varchar",
+        "databricks_type": "STRING",
+        "comment": "Interpretation of the test."
+      }
+    ]
+  },
+  "note_events": {
+    "table_name": "noteevents",
+    "columns": [
+      {
+        "name": "ROW_ID",
+        "pg_type": "int4",
+        "databricks_type": "INT",
+        "comment": "Unique row identifier."
+      },
+      {
+        "name": "SUBJECT_ID",
+        "pg_type": "int4",
+        "databricks_type": "INT",
+        "comment": "Foreign key. Identifies the patient."
+      },
+      {
+        "name": "HADM_ID",
+        "pg_type": "int4",
+        "databricks_type": "INT",
+        "comment": "Foreign key. Identifies the hospital stay."
+      },
+      {
+        "name": "CHARTDATE",
+        "pg_type": "timestamp",
+        "databricks_type": "TIMESTAMP",
+        "comment": "Date when the note was charted."
+      },
+      {
+        "name": "CHARTTIME",
+        "pg_type": "timestamp",
+        "databricks_type": "TIMESTAMP",
+        "comment": "Date and time when the note was charted. Note that some notes (e.g. discharge summaries) do not have a time associated with them: these notes have NULL in this column."
+      },
+      {
+        "name": "STORETIME",
+        "pg_type": "timestamp",
+        "databricks_type": "TIMESTAMP",
+        "comment": ""
+      },
+      {
+        "name": "CATEGORY",
+        "pg_type": "varchar",
+        "databricks_type": "STRING",
+        "comment": "Category of the note, e.g. Discharge summary."
+      },
+      {
+        "name": "DESCRIPTION",
+        "pg_type": "varchar",
+        "databricks_type": "STRING",
+        "comment": "A more detailed categorization for the note, sometimes entered by free-text."
+      },
+      {
+        "name": "CGID",
+        "pg_type": "int4",
+        "databricks_type": "INT",
+        "comment": "Foreign key. Identifies the caregiver."
+      },
+      {
+        "name": "ISERROR",
+        "pg_type": "bpchar",
+        "databricks_type": "STRING",
+        "comment": "Flag to highlight an error with the note."
+      },
+      {
+        "name": "TEXT",
+        "pg_type": "text",
+        "databricks_type": "STRING",
+        "comment": "Content of the note."
+      }
+    ]
+  },
+  "prescriptions": {
+    "table_name": "prescriptions",
+    "columns": [
+      {
+        "name": "ROW_ID",
+        "pg_type": "int4",
+        "databricks_type": "INT",
+        "comment": "Unique row identifier."
+      },
+      {
+        "name": "SUBJECT_ID",
+        "pg_type": "int4",
+        "databricks_type": "INT",
+        "comment": "Foreign key. Identifies the patient."
+      },
+      {
+        "name": "HADM_ID",
+        "pg_type": "int4",
+        "databricks_type": "INT",
+        "comment": "Foreign key. Identifies the hospital stay."
+      },
+      {
+        "name": "ICUSTAY_ID",
+        "pg_type": "int4",
+        "databricks_type": "INT",
+        "comment": "Foreign key. Identifies the ICU stay."
+      },
+      {
+        "name": "STARTDATE",
+        "pg_type": "timestamp",
+        "databricks_type": "TIMESTAMP",
+        "comment": "Date when the prescription started."
+      },
+      {
+        "name": "ENDDATE",
+        "pg_type": "timestamp",
+        "databricks_type": "TIMESTAMP",
+        "comment": "Date when the prescription ended."
+      },
+      {
+        "name": "DRUG_TYPE",
+        "pg_type": "varchar",
+        "databricks_type": "STRING",
+        "comment": "Type of drug."
+      },
+      {
+        "name": "DRUG",
+        "pg_type": "varchar",
+        "databricks_type": "STRING",
+        "comment": "Name of the drug."
+      },
+      {
+        "name": "DRUG_NAME_POE",
+        "pg_type": "varchar",
+        "databricks_type": "STRING",
+        "comment": "Name of the drug on the Provider Order Entry interface."
+      },
+      {
+        "name": "DRUG_NAME_GENERIC",
+        "pg_type": "varchar",
+        "databricks_type": "STRING",
+        "comment": "Generic drug name."
+      },
+      {
+        "name": "FORMULARY_DRUG_CD",
+        "pg_type": "varchar",
+        "databricks_type": "STRING",
+        "comment": "Formulary drug code."
+      },
+      {
+        "name": "GSN",
+        "pg_type": "varchar",
+        "databricks_type": "STRING",
+        "comment": "Generic Sequence Number."
+      },
+      {
+        "name": "NDC",
+        "pg_type": "varchar",
+        "databricks_type": "STRING",
+        "comment": "National Drug Code."
+      },
+      {
+        "name": "PROD_STRENGTH",
+        "pg_type": "varchar",
+        "databricks_type": "STRING",
+        "comment": "Strength of the drug (product)."
+      },
+      {
+        "name": "DOSE_VAL_RX",
+        "pg_type": "varchar",
+        "databricks_type": "STRING",
+        "comment": "Dose of the drug prescribed."
+      },
+      {
+        "name": "DOSE_UNIT_RX",
+        "pg_type": "varchar",
+        "databricks_type": "STRING",
+        "comment": "Unit of measurement associated with the dose."
+      },
+      {
+        "name": "FORM_VAL_DISP",
+        "pg_type": "varchar",
+        "databricks_type": "STRING",
+        "comment": "Amount of the formulation dispensed."
+      },
+      {
+        "name": "FORM_UNIT_DISP",
+        "pg_type": "varchar",
+        "databricks_type": "STRING",
+        "comment": "Unit of measurement associated with the formulation."
+      },
+      {
+        "name": "ROUTE",
+        "pg_type": "varchar",
+        "databricks_type": "STRING",
+        "comment": "Route of administration, for example intravenous or oral."
+      }
+    ]
+  },
+  "input_events_cv": {
+    "table_name": "inputevents_cv",
+    "columns": [
+      {
+        "name": "ROW_ID",
+        "pg_type": "int4",
+        "databricks_type": "INT",
+        "comment": "Unique row identifier."
+      },
+      {
+        "name": "SUBJECT_ID",
+        "pg_type": "int4",
+        "databricks_type": "INT",
+        "comment": "Foreign key. Identifies the patient."
+      },
+      {
+        "name": "HADM_ID",
+        "pg_type": "int4",
+        "databricks_type": "INT",
+        "comment": "Foreign key. Identifies the hospital stay."
+      },
+      {
+        "name": "ICUSTAY_ID",
+        "pg_type": "int4",
+        "databricks_type": "INT",
+        "comment": "Foreign key. Identifies the ICU stay."
+      },
+      {
+        "name": "CHARTTIME",
+        "pg_type": "timestamp",
+        "databricks_type": "TIMESTAMP",
+        "comment": "Time of that the input was started or received."
+      },
+      {
+        "name": "ITEMID",
+        "pg_type": "int4",
+        "databricks_type": "INT",
+        "comment": "Foreign key. Identifies the charted item."
+      },
+      {
+        "name": "AMOUNT",
+        "pg_type": "float8",
+        "databricks_type": "DOUBLE",
+        "comment": "Amount of the item administered to the patient."
+      },
+      {
+        "name": "AMOUNTUOM",
+        "pg_type": "varchar",
+        "databricks_type": "STRING",
+        "comment": "Unit of measurement for the amount."
+      },
+      {
+        "name": "RATE",
+        "pg_type": "float8",
+        "databricks_type": "DOUBLE",
+        "comment": "Rate at which the item is being administered to the patient."
+      },
+      {
+        "name": "RATEUOM",
+        "pg_type": "varchar",
+        "databricks_type": "STRING",
+        "comment": "Unit of measurement for the rate."
+      },
+      {
+        "name": "STORETIME",
+        "pg_type": "timestamp",
+        "databricks_type": "TIMESTAMP",
+        "comment": "Time when the event was recorded in the system."
+      },
+      {
+        "name": "CGID",
+        "pg_type": "int4",
+        "databricks_type": "INT",
+        "comment": "Foreign key. Identifies the caregiver."
+      },
+      {
+        "name": "ORDERID",
+        "pg_type": "int4",
+        "databricks_type": "INT",
+        "comment": "Identifier linking items which are grouped in a solution."
+      },
+      {
+        "name": "LINKORDERID",
+        "pg_type": "int4",
+        "databricks_type": "INT",
+        "comment": "Identifier linking orders across multiple administrations. LINKORDERID is always equal to the first occuring ORDERID of the series."
+      },
+      {
+        "name": "STOPPED",
+        "pg_type": "varchar",
+        "databricks_type": "STRING",
+        "comment": "Event was explicitly marked as stopped. Infrequently used by caregivers."
+      },
+      {
+        "name": "NEWBOTTLE",
+        "pg_type": "int4",
+        "databricks_type": "INT",
+        "comment": "Indicates when a new bottle of the solution was hung at the bedside."
+      },
+      {
+        "name": "ORIGINALAMOUNT",
+        "pg_type": "float8",
+        "databricks_type": "DOUBLE",
+        "comment": "Amount of the item which was originally charted."
+      },
+      {
+        "name": "ORIGINALAMOUNTUOM",
+        "pg_type": "varchar",
+        "databricks_type": "STRING",
+        "comment": "Unit of measurement for the original amount."
+      },
+      {
+        "name": "ORIGINALROUTE",
+        "pg_type": "varchar",
+        "databricks_type": "STRING",
+        "comment": "Route of administration originally chosen for the item."
+      },
+      {
+        "name": "ORIGINALRATE",
+        "pg_type": "float8",
+        "databricks_type": "DOUBLE",
+        "comment": "Rate of administration originally chosen for the item."
+      },
+      {
+        "name": "ORIGINALRATEUOM",
+        "pg_type": "varchar",
+        "databricks_type": "STRING",
+        "comment": "Unit of measurement for the rate originally chosen."
+      },
+      {
+        "name": "ORIGINALSITE",
+        "pg_type": "varchar",
+        "databricks_type": "STRING",
+        "comment": "Anatomical site for the original administration of the item."
+      }
+    ]
+  },
+  "input_events_mv": {
+    "table_name": "inputevents_mv",
+    "columns": [
+      {
+        "name": "ROW_ID",
+        "pg_type": "int4",
+        "databricks_type": "INT",
+        "comment": "Unique row identifier."
+      },
+      {
+        "name": "SUBJECT_ID",
+        "pg_type": "int4",
+        "databricks_type": "INT",
+        "comment": "Foreign key. Identifies the patient."
+      },
+      {
+        "name": "HADM_ID",
+        "pg_type": "int4",
+        "databricks_type": "INT",
+        "comment": "Foreign key. Identifies the hospital stay."
+      },
+      {
+        "name": "ICUSTAY_ID",
+        "pg_type": "int4",
+        "databricks_type": "INT",
+        "comment": "Foreign key. Identifies the ICU stay."
+      },
+      {
+        "name": "STARTTIME",
+        "pg_type": "timestamp",
+        "databricks_type": "TIMESTAMP",
+        "comment": "Time when the event started."
+      },
+      {
+        "name": "ENDTIME",
+        "pg_type": "timestamp",
+        "databricks_type": "TIMESTAMP",
+        "comment": "Time when the event ended."
+      },
+      {
+        "name": "ITEMID",
+        "pg_type": "int4",
+        "databricks_type": "INT",
+        "comment": "Foreign key. Identifies the charted item."
+      },
+      {
+        "name": "AMOUNT",
+        "pg_type": "float8",
+        "databricks_type": "DOUBLE",
+        "comment": "Amount of the item administered to the patient."
+      },
+      {
+        "name": "AMOUNTUOM",
+        "pg_type": "varchar",
+        "databricks_type": "STRING",
+        "comment": "Unit of measurement for the amount."
+      },
+      {
+        "name": "RATE",
+        "pg_type": "float8",
+        "databricks_type": "DOUBLE",
+        "comment": "Rate at which the item is being administered to the patient."
+      },
+      {
+        "name": "RATEUOM",
+        "pg_type": "varchar",
+        "databricks_type": "STRING",
+        "comment": "Unit of measurement for the rate."
+      },
+      {
+        "name": "STORETIME",
+        "pg_type": "timestamp",
+        "databricks_type": "TIMESTAMP",
+        "comment": "Time when the event was recorded in the system."
+      },
+      {
+        "name": "CGID",
+        "pg_type": "int4",
+        "databricks_type": "INT",
+        "comment": "Foreign key. Identifies the caregiver."
+      },
+      {
+        "name": "ORDERID",
+        "pg_type": "int4",
+        "databricks_type": "INT",
+        "comment": "Identifier linking items which are grouped in a solution."
+      },
+      {
+        "name": "LINKORDERID",
+        "pg_type": "int4",
+        "databricks_type": "INT",
+        "comment": "Identifier linking orders across multiple administrations. LINKORDERID is always equal to the first occuring ORDERID of the series."
+      },
+      {
+        "name": "ORDERCATEGORYNAME",
+        "pg_type": "varchar",
+        "databricks_type": "STRING",
+        "comment": "A group which the item corresponds to."
+      },
+      {
+        "name": "SECONDARYORDERCATEGORYNAME",
+        "pg_type": "varchar",
+        "databricks_type": "STRING",
+        "comment": "A secondary group for those items with more than one grouping possible."
+      },
+      {
+        "name": "ORDERCOMPONENTTYPEDESCRIPTION",
+        "pg_type": "varchar",
+        "databricks_type": "STRING",
+        "comment": "The role of the item administered in the order."
+      },
+      {
+        "name": "ORDERCATEGORYDESCRIPTION",
+        "pg_type": "varchar",
+        "databricks_type": "STRING",
+        "comment": "The type of item administered."
+      },
+      {
+        "name": "PATIENTWEIGHT",
+        "pg_type": "float8",
+        "databricks_type": "DOUBLE",
+        "comment": "For drugs dosed by weight, the value of the weight used in the calculation."
+      },
+      {
+        "name": "TOTALAMOUNT",
+        "pg_type": "float8",
+        "databricks_type": "DOUBLE",
+        "comment": "The total amount in the solution for the given item."
+      },
+      {
+        "name": "TOTALAMOUNTUOM",
+        "pg_type": "varchar",
+        "databricks_type": "STRING",
+        "comment": "Unit of measurement for the total amount in the solution."
+      },
+      {
+        "name": "ISOPENBAG",
+        "pg_type": "int2",
+        "databricks_type": "SMALLINT",
+        "comment": "Indicates whether the bag containing the solution is open."
+      },
+      {
+        "name": "CONTINUEINNEXTDEPT",
+        "pg_type": "int2",
+        "databricks_type": "SMALLINT",
+        "comment": "Indicates whether the item will be continued in the next department where the patient is transferred to."
+      },
+      {
+        "name": "CANCELREASON",
+        "pg_type": "int2",
+        "databricks_type": "SMALLINT",
+        "comment": "Reason for cancellation, if cancelled."
+      },
+      {
+        "name": "STATUSDESCRIPTION",
+        "pg_type": "varchar",
+        "databricks_type": "STRING",
+        "comment": "The current status of the order: stopped, rewritten, running or cancelled."
+      },
+      {
+        "name": "COMMENTS_EDITEDBY",
+        "pg_type": "varchar",
+        "databricks_type": "STRING",
+        "comment": "The title of the caregiver who edited the order."
+      },
+      {
+        "name": "COMMENTS_CANCELEDBY",
+        "pg_type": "varchar",
+        "databricks_type": "STRING",
+        "comment": "The title of the caregiver who canceled the order."
+      },
+      {
+        "name": "COMMENTS_DATE",
+        "pg_type": "timestamp",
+        "databricks_type": "TIMESTAMP",
+        "comment": "Time at which the caregiver edited or cancelled the order."
+      },
+      {
+        "name": "ORIGINALAMOUNT",
+        "pg_type": "float8",
+        "databricks_type": "DOUBLE",
+        "comment": "Amount of the item which was originally charted."
+      },
+      {
+        "name": "ORIGINALRATE",
+        "pg_type": "float8",
+        "databricks_type": "DOUBLE",
+        "comment": "Rate of administration originally chosen for the item."
+      }
+    ]
+  },
+  "output_events": {
+    "table_name": "outputevents",
+    "columns": [
+      {
+        "name": "ROW_ID",
+        "pg_type": "int4",
+        "databricks_type": "INT",
+        "comment": ""
+      },
+      {
+        "name": "SUBJECT_ID",
+        "pg_type": "int4",
+        "databricks_type": "INT",
+        "comment": ""
+      },
+      {
+        "name": "HADM_ID",
+        "pg_type": "int4",
+        "databricks_type": "INT",
+        "comment": ""
+      },
+      {
+        "name": "ICUSTAY_ID",
+        "pg_type": "int4",
+        "databricks_type": "INT",
+        "comment": ""
+      },
+      {
+        "name": "CHARTTIME",
+        "pg_type": "timestamp",
+        "databricks_type": "TIMESTAMP",
+        "comment": ""
+      },
+      {
+        "name": "ITEMID",
+        "pg_type": "int4",
+        "databricks_type": "INT",
+        "comment": ""
+      },
+      {
+        "name": "VALUE",
+        "pg_type": "float8",
+        "databricks_type": "DOUBLE",
+        "comment": ""
+      },
+      {
+        "name": "VALUEUOM",
+        "pg_type": "varchar",
+        "databricks_type": "STRING",
+        "comment": ""
+      },
+      {
+        "name": "STORETIME",
+        "pg_type": "timestamp",
+        "databricks_type": "TIMESTAMP",
+        "comment": ""
+      },
+      {
+        "name": "CGID",
+        "pg_type": "int4",
+        "databricks_type": "INT",
+        "comment": ""
+      },
+      {
+        "name": "STOPPED",
+        "pg_type": "varchar",
+        "databricks_type": "STRING",
+        "comment": ""
+      },
+      {
+        "name": "NEWBOTTLE",
+        "pg_type": "bpchar",
+        "databricks_type": "STRING",
+        "comment": ""
+      },
+      {
+        "name": "ISERROR",
+        "pg_type": "int4",
+        "databricks_type": "INT",
+        "comment": ""
+      }
+    ]
+  },
+  "procedure_events_mv": {
+    "table_name": "procedureevents_mv",
+    "columns": [
+      {
+        "name": "ROW_ID",
+        "pg_type": "int4",
+        "databricks_type": "INT",
+        "comment": ""
+      },
+      {
+        "name": "SUBJECT_ID",
+        "pg_type": "int4",
+        "databricks_type": "INT",
+        "comment": ""
+      },
+      {
+        "name": "HADM_ID",
+        "pg_type": "int4",
+        "databricks_type": "INT",
+        "comment": ""
+      },
+      {
+        "name": "ICUSTAY_ID",
+        "pg_type": "int4",
+        "databricks_type": "INT",
+        "comment": ""
+      },
+      {
+        "name": "STARTTIME",
+        "pg_type": "timestamp",
+        "databricks_type": "TIMESTAMP",
+        "comment": ""
+      },
+      {
+        "name": "ENDTIME",
+        "pg_type": "timestamp",
+        "databricks_type": "TIMESTAMP",
+        "comment": ""
+      },
+      {
+        "name": "ITEMID",
+        "pg_type": "int4",
+        "databricks_type": "INT",
+        "comment": ""
+      },
+      {
+        "name": "VALUE",
+        "pg_type": "float8",
+        "databricks_type": "DOUBLE",
+        "comment": ""
+      },
+      {
+        "name": "VALUEUOM",
+        "pg_type": "varchar",
+        "databricks_type": "STRING",
+        "comment": ""
+      },
+      {
+        "name": "LOCATION",
+        "pg_type": "varchar",
+        "databricks_type": "STRING",
+        "comment": ""
+      },
+      {
+        "name": "LOCATIONCATEGORY",
+        "pg_type": "varchar",
+        "databricks_type": "STRING",
+        "comment": ""
+      },
+      {
+        "name": "STORETIME",
+        "pg_type": "timestamp",
+        "databricks_type": "TIMESTAMP",
+        "comment": ""
+      },
+      {
+        "name": "CGID",
+        "pg_type": "int4",
+        "databricks_type": "INT",
+        "comment": ""
+      },
+      {
+        "name": "ORDERID",
+        "pg_type": "int4",
+        "databricks_type": "INT",
+        "comment": ""
+      },
+      {
+        "name": "LINKORDERID",
+        "pg_type": "int4",
+        "databricks_type": "INT",
+        "comment": ""
+      },
+      {
+        "name": "ORDERCATEGORYNAME",
+        "pg_type": "varchar",
+        "databricks_type": "STRING",
+        "comment": ""
+      },
+      {
+        "name": "SECONDARYORDERCATEGORYNAME",
+        "pg_type": "varchar",
+        "databricks_type": "STRING",
+        "comment": ""
+      },
+      {
+        "name": "ORDERCATEGORYDESCRIPTION",
+        "pg_type": "varchar",
+        "databricks_type": "STRING",
+        "comment": ""
+      },
+      {
+        "name": "ISOPENBAG",
+        "pg_type": "int2",
+        "databricks_type": "SMALLINT",
+        "comment": ""
+      },
+      {
+        "name": "CONTINUEINNEXTDEPT",
+        "pg_type": "int2",
+        "databricks_type": "SMALLINT",
+        "comment": ""
+      },
+      {
+        "name": "CANCELREASON",
+        "pg_type": "int2",
+        "databricks_type": "SMALLINT",
+        "comment": ""
+      },
+      {
+        "name": "STATUSDESCRIPTION",
+        "pg_type": "varchar",
+        "databricks_type": "STRING",
+        "comment": ""
+      },
+      {
+        "name": "COMMENTS_EDITEDBY",
+        "pg_type": "varchar",
+        "databricks_type": "STRING",
+        "comment": ""
+      },
+      {
+        "name": "COMMENTS_CANCELEDBY",
+        "pg_type": "varchar",
+        "databricks_type": "STRING",
+        "comment": ""
+      },
+      {
+        "name": "COMMENTS_DATE",
+        "pg_type": "timestamp",
+        "databricks_type": "TIMESTAMP",
+        "comment": ""
+      }
+    ]
+  },
+  "procedures_icd": {
+    "table_name": "procedures_icd",
+    "columns": [
+      {
+        "name": "ROW_ID",
+        "pg_type": "int4",
+        "databricks_type": "INT",
+        "comment": "Unique row identifier."
+      },
+      {
+        "name": "SUBJECT_ID",
+        "pg_type": "int4",
+        "databricks_type": "INT",
+        "comment": "Foreign key. Identifies the patient."
+      },
+      {
+        "name": "HADM_ID",
+        "pg_type": "int4",
+        "databricks_type": "INT",
+        "comment": "Foreign key. Identifies the hospital stay."
+      },
+      {
+        "name": "SEQ_NUM",
+        "pg_type": "int4",
+        "databricks_type": "INT",
+        "comment": "Lower procedure numbers occurred earlier."
+      },
+      {
+        "name": "ICD9_CODE",
+        "pg_type": "varchar",
+        "databricks_type": "STRING",
+        "comment": "ICD9 code associated with the procedure."
+      }
+    ]
+  },
+  "cpt_events": {
+    "table_name": "cptevents",
+    "columns": [
+      {
+        "name": "ROW_ID",
+        "pg_type": "int4",
+        "databricks_type": "INT",
+        "comment": "Unique row identifier."
+      },
+      {
+        "name": "SUBJECT_ID",
+        "pg_type": "int4",
+        "databricks_type": "INT",
+        "comment": "Foreign key. Identifies the patient."
+      },
+      {
+        "name": "HADM_ID",
+        "pg_type": "int4",
+        "databricks_type": "INT",
+        "comment": "Foreign key. Identifies the hospital stay."
+      },
+      {
+        "name": "COSTCENTER",
+        "pg_type": "varchar",
+        "databricks_type": "STRING",
+        "comment": "Center recording the code, for example the ICU or the respiratory unit."
+      },
+      {
+        "name": "CHARTDATE",
+        "pg_type": "timestamp",
+        "databricks_type": "TIMESTAMP",
+        "comment": "Date when the event occured, if available."
+      },
+      {
+        "name": "CPT_CD",
+        "pg_type": "varchar",
+        "databricks_type": "STRING",
+        "comment": "Current Procedural Terminology code."
+      },
+      {
+        "name": "CPT_NUMBER",
+        "pg_type": "int4",
+        "databricks_type": "INT",
+        "comment": "Numerical element of the Current Procedural Terminology code."
+      },
+      {
+        "name": "CPT_SUFFIX",
+        "pg_type": "varchar",
+        "databricks_type": "STRING",
+        "comment": "Text element of the Current Procedural Terminology, if any. Indicates code category."
+      },
+      {
+        "name": "TICKET_ID_SEQ",
+        "pg_type": "int4",
+        "databricks_type": "INT",
+        "comment": "Sequence number of the event, derived from the ticket ID."
+      },
+      {
+        "name": "SECTIONHEADER",
+        "pg_type": "varchar",
+        "databricks_type": "STRING",
+        "comment": "High-level section of the Current Procedural Terminology code."
+      },
+      {
+        "name": "SUBSECTIONHEADER",
+        "pg_type": "varchar",
+        "databricks_type": "STRING",
+        "comment": "Subsection of the Current Procedural Terminology code."
+      },
+      {
+        "name": "DESCRIPTION",
+        "pg_type": "varchar",
+        "databricks_type": "STRING",
+        "comment": "Description of the Current Procedural Terminology, if available."
+      }
+    ]
+  },
+  "diagnoses_icd": {
+    "table_name": "diagnoses_icd",
+    "columns": [
+      {
+        "name": "ROW_ID",
+        "pg_type": "int4",
+        "databricks_type": "INT",
+        "comment": "Unique row identifier."
+      },
+      {
+        "name": "SUBJECT_ID",
+        "pg_type": "int4",
+        "databricks_type": "INT",
+        "comment": "Foreign key. Identifies the patient."
+      },
+      {
+        "name": "HADM_ID",
+        "pg_type": "int4",
+        "databricks_type": "INT",
+        "comment": "Foreign key. Identifies the hospital stay."
+      },
+      {
+        "name": "SEQ_NUM",
+        "pg_type": "int4",
+        "databricks_type": "INT",
+        "comment": "Priority of the code. Sequence 1 is the primary code."
+      },
+      {
+        "name": "ICD9_CODE",
+        "pg_type": "varchar",
+        "databricks_type": "STRING",
+        "comment": "ICD9 code for the diagnosis."
+      }
+    ]
+  },
+  "drg_codes": {
+    "table_name": "drgcodes",
+    "columns": [
+      {
+        "name": "ROW_ID",
+        "pg_type": "int4",
+        "databricks_type": "INT",
+        "comment": "Unique row identifier."
+      },
+      {
+        "name": "SUBJECT_ID",
+        "pg_type": "int4",
+        "databricks_type": "INT",
+        "comment": "Foreign key. Identifies the patient."
+      },
+      {
+        "name": "HADM_ID",
+        "pg_type": "int4",
+        "databricks_type": "INT",
+        "comment": "Foreign key. Identifies the hospital stay."
+      },
+      {
+        "name": "DRG_TYPE",
+        "pg_type": "varchar",
+        "databricks_type": "STRING",
+        "comment": "Type of Diagnosis-Related Group, for example APR is All Patient Refined"
+      },
+      {
+        "name": "DRG_CODE",
+        "pg_type": "varchar",
+        "databricks_type": "STRING",
+        "comment": "Diagnosis-Related Group code"
+      },
+      {
+        "name": "DESCRIPTION",
+        "pg_type": "varchar",
+        "databricks_type": "STRING",
+        "comment": "Description of the Diagnosis-Related Group"
+      },
+      {
+        "name": "DRG_SEVERITY",
+        "pg_type": "int2",
+        "databricks_type": "SMALLINT",
+        "comment": "Relative severity, available for type APR only."
+      },
+      {
+        "name": "DRG_MORTALITY",
+        "pg_type": "int2",
+        "databricks_type": "SMALLINT",
+        "comment": "Relative mortality, available for type APR only."
+      }
+    ]
+  },
+  "d_icd_diagnoses": {
+    "table_name": "d_icd_diagnoses",
+    "columns": [
+      {
+        "name": "ROW_ID",
+        "pg_type": "int4",
+        "databricks_type": "INT",
+        "comment": "Unique row identifier."
+      },
+      {
+        "name": "ICD9_CODE",
+        "pg_type": "varchar",
+        "databricks_type": "STRING",
+        "comment": "ICD9 code - note that this is a fixed length character field, as whitespaces are important in uniquely identifying ICD-9 codes."
+      },
+      {
+        "name": "SHORT_TITLE",
+        "pg_type": "varchar",
+        "databricks_type": "STRING",
+        "comment": "Short title associated with the code."
+      },
+      {
+        "name": "LONG_TITLE",
+        "pg_type": "varchar",
+        "databricks_type": "STRING",
+        "comment": "Long title associated with the code."
+      }
+    ]
+  },
+  "d_icd_procedures": {
+    "table_name": "d_icd_procedures",
+    "columns": [
+      {
+        "name": "ROW_ID",
+        "pg_type": "int4",
+        "databricks_type": "INT",
+        "comment": "Unique row identifier."
+      },
+      {
+        "name": "ICD9_CODE",
+        "pg_type": "varchar",
+        "databricks_type": "STRING",
+        "comment": "ICD9 code - note that this is a fixed length character field, as whitespaces are important in uniquely identifying ICD-9 codes."
+      },
+      {
+        "name": "SHORT_TITLE",
+        "pg_type": "varchar",
+        "databricks_type": "STRING",
+        "comment": "Short title associated with the code."
+      },
+      {
+        "name": "LONG_TITLE",
+        "pg_type": "varchar",
+        "databricks_type": "STRING",
+        "comment": "Long title associated with the code."
+      }
+    ]
+  },
+  "d_labitems": {
+    "table_name": "d_labitems",
+    "columns": [
+      {
+        "name": "ROW_ID",
+        "pg_type": "int4",
+        "databricks_type": "INT",
+        "comment": "Unique row identifier."
+      },
+      {
+        "name": "ITEMID",
+        "pg_type": "int4",
+        "databricks_type": "INT",
+        "comment": "Foreign key. Identifies the charted item."
+      },
+      {
+        "name": "LABEL",
+        "pg_type": "varchar",
+        "databricks_type": "STRING",
+        "comment": "Label identifying the item."
+      },
+      {
+        "name": "FLUID",
+        "pg_type": "varchar",
+        "databricks_type": "STRING",
+        "comment": "Fluid associated with the item, for example blood or urine."
+      },
+      {
+        "name": "CATEGORY",
+        "pg_type": "varchar",
+        "databricks_type": "STRING",
+        "comment": "Category of item, for example chemistry or hematology."
+      },
+      {
+        "name": "LOINC_CODE",
+        "pg_type": "varchar",
+        "databricks_type": "STRING",
+        "comment": "Logical Observation Identifiers Names and Codes (LOINC) mapped to the item, if available."
+      }
+    ]
+  },
+  "callout": {
+    "table_name": "callout",
+    "columns": [
+      {
+        "name": "ROW_ID",
+        "pg_type": "int4",
+        "databricks_type": "INT",
+        "comment": "Unique row identifier."
+      },
+      {
+        "name": "SUBJECT_ID",
+        "pg_type": "int4",
+        "databricks_type": "INT",
+        "comment": "Foreign key. Identifies the patient."
+      },
+      {
+        "name": "HADM_ID",
+        "pg_type": "int4",
+        "databricks_type": "INT",
+        "comment": "Foreign key. Identifies the hospital stay."
+      },
+      {
+        "name": "SUBMIT_WARDID",
+        "pg_type": "int4",
+        "databricks_type": "INT",
+        "comment": "Identifies the ward where the call out request was submitted."
+      },
+      {
+        "name": "SUBMIT_CAREUNIT",
+        "pg_type": "varchar",
+        "databricks_type": "STRING",
+        "comment": "If the ward where the call was submitted was an ICU, the ICU type is listed here."
+      },
+      {
+        "name": "CURR_WARDID",
+        "pg_type": "int4",
+        "databricks_type": "INT",
+        "comment": "Identifies the ward where the patient is currently residing."
+      },
+      {
+        "name": "CURR_CAREUNIT",
+        "pg_type": "varchar",
+        "databricks_type": "STRING",
+        "comment": "If the ward where the patient is currently residing is an ICU, the ICU type is listed here."
+      },
+      {
+        "name": "CALLOUT_WARDID",
+        "pg_type": "int4",
+        "databricks_type": "INT",
+        "comment": "Identifies the ward where the patient is to be discharged to. A value of 1 indicates the first available ward. A value of 0 indicates home."
+      },
+      {
+        "name": "CALLOUT_SERVICE",
+        "pg_type": "varchar",
+        "databricks_type": "STRING",
+        "comment": "Identifies the service that the patient is called out to."
+      },
+      {
+        "name": "REQUEST_TELE",
+        "pg_type": "int2",
+        "databricks_type": "SMALLINT",
+        "comment": "Indicates if special precautions are required."
+      },
+      {
+        "name": "REQUEST_RESP",
+        "pg_type": "int2",
+        "databricks_type": "SMALLINT",
+        "comment": "Indicates if special precautions are required."
+      },
+      {
+        "name": "REQUEST_CDIFF",
+        "pg_type": "int2",
+        "databricks_type": "SMALLINT",
+        "comment": "Indicates if special precautions are required."
+      },
+      {
+        "name": "REQUEST_MRSA",
+        "pg_type": "int2",
+        "databricks_type": "SMALLINT",
+        "comment": "Indicates if special precautions are required."
+      },
+      {
+        "name": "REQUEST_VRE",
+        "pg_type": "int2",
+        "databricks_type": "SMALLINT",
+        "comment": "Indicates if special precautions are required."
+      },
+      {
+        "name": "CALLOUT_STATUS",
+        "pg_type": "varchar",
+        "databricks_type": "STRING",
+        "comment": "Current status of the call out request."
+      },
+      {
+        "name": "CALLOUT_OUTCOME",
+        "pg_type": "varchar",
+        "databricks_type": "STRING",
+        "comment": "The result of the call out request; either a cancellation or a discharge."
+      },
+      {
+        "name": "DISCHARGE_WARDID",
+        "pg_type": "int4",
+        "databricks_type": "INT",
+        "comment": "The ward to which the patient was discharged."
+      },
+      {
+        "name": "ACKNOWLEDGE_STATUS",
+        "pg_type": "varchar",
+        "databricks_type": "STRING",
+        "comment": "The status of the response to the call out request."
+      },
+      {
+        "name": "CREATETIME",
+        "pg_type": "timestamp",
+        "databricks_type": "TIMESTAMP",
+        "comment": "Time at which the call out request was created."
+      },
+      {
+        "name": "UPDATETIME",
+        "pg_type": "timestamp",
+        "databricks_type": "TIMESTAMP",
+        "comment": "Last time at which the call out request was updated."
+      },
+      {
+        "name": "ACKNOWLEDGETIME",
+        "pg_type": "timestamp",
+        "databricks_type": "TIMESTAMP",
+        "comment": "Time at which the call out request was acknowledged."
+      },
+      {
+        "name": "OUTCOMETIME",
+        "pg_type": "timestamp",
+        "databricks_type": "TIMESTAMP",
+        "comment": "Time at which the outcome (cancelled or discharged) occurred."
+      },
+      {
+        "name": "FIRSTRESERVATIONTIME",
+        "pg_type": "timestamp",
+        "databricks_type": "TIMESTAMP",
+        "comment": "First time at which a ward was reserved for the call out request."
+      },
+      {
+        "name": "CURRENTRESERVATIONTIME",
+        "pg_type": "timestamp",
+        "databricks_type": "TIMESTAMP",
+        "comment": "Latest time at which a ward was reserved for the call out request."
+      }
+    ]
+  },
+  "caregivers": {
+    "table_name": "caregivers",
+    "columns": [
+      {
+        "name": "ROW_ID",
+        "pg_type": "int4",
+        "databricks_type": "INT",
+        "comment": "Unique row identifier."
+      },
+      {
+        "name": "CGID",
+        "pg_type": "int4",
+        "databricks_type": "INT",
+        "comment": "Unique caregiver identifier."
+      },
+      {
+        "name": "LABEL",
+        "pg_type": "varchar",
+        "databricks_type": "STRING",
+        "comment": "Title of the caregiver, for example MD or RN."
+      },
+      {
+        "name": "DESCRIPTION",
+        "pg_type": "varchar",
+        "databricks_type": "STRING",
+        "comment": "More detailed description of the caregiver, if available."
+      }
+    ]
+  },
+  "services": {
+    "table_name": "services",
+    "columns": [
+      {
+        "name": "ROW_ID",
+        "pg_type": "int4",
+        "databricks_type": "INT",
+        "comment": "Unique row identifier."
+      },
+      {
+        "name": "SUBJECT_ID",
+        "pg_type": "int4",
+        "databricks_type": "INT",
+        "comment": "Foreign key. Identifies the patient."
+      },
+      {
+        "name": "HADM_ID",
+        "pg_type": "int4",
+        "databricks_type": "INT",
+        "comment": "Foreign key. Identifies the hospital stay."
+      },
+      {
+        "name": "TRANSFERTIME",
+        "pg_type": "timestamp",
+        "databricks_type": "TIMESTAMP",
+        "comment": "Time when the transfer occured."
+      },
+      {
+        "name": "PREV_SERVICE",
+        "pg_type": "varchar",
+        "databricks_type": "STRING",
+        "comment": "Previous service type."
+      },
+      {
+        "name": "CURR_SERVICE",
+        "pg_type": "varchar",
+        "databricks_type": "STRING",
+        "comment": "Current service type."
+      }
+    ]
+  }
+}
