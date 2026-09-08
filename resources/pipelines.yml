@@ -3,6 +3,9 @@ resources:
     icu_step_down_pipeline:
       name: icu-step-down-readiness-medallion
       catalog: ${var.catalog}
+      # schema is a required API field for UC pipelines but is not the actual
+      # output location — all dataset CREATE statements use fully-qualified names
+      # spanning bronze, silver, and gold schemas. This field is an API placeholder.
       schema: bronze
       serverless: true
       channel: CURRENT

@@ -17,13 +17,17 @@
 
 | on_vasopressors | on_ventilator | count |
 |-----------------|---------------|-------|
-| false | false | 40,058 |
-| true | false | 11,682 |
-| true | true | 5,542 |
-| false | true | 4,250 |
+| false | false | 32,342 |
+| false | true | 11,966 |
+| true | true | 14,017 |
+| true | false | 3,207 |
 
 Vasopressor rate: 27.9% of ICU stays (17,224 / 61,532)  
-Ventilator rate: 16.4% of ICU stays (9,792 / 61,532)
+Ventilator rate: 42.2% of ICU stays (25,983 / 61,532)
+
+Note: ventilator rate increased from 15.9% (v1, MetaVision only) to 42.2% (v2)
+after adding CareVue itemids 720/722 and MetaVision 223849 to on_ventilator detection.
+The CareVue cohort (~40% of MIMIC stays) was not captured by procedure_events_mv alone.
 
 ## gold.readiness_training_set — Label Balance
 

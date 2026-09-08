@@ -45,17 +45,41 @@ Rows after physiological plausibility filtering:
 | gcs | 944,583 |
 | **total** | **21,771,413** |
 
-Note: bronze.chart_events had 37,625,847 scoped rows; silver.vital_signs has 21,771,413
-after filtering NULL VALUENUM, ERROR IS NULL, icustay_id IS NOT NULL, and plausibility
-ranges. Reduction of ~42% is expected (many chart_events lack icustay_id linkage).
+## GCS Value Distribution (vital_name='gcs')
+
+GCS values verified as unified 3–15 total for both eras:
+- CareVue itemid 198: GCS total directly (unchanged)
+- MetaVision: Eye (220739) + Verbal (223900) + Motor (223901) SUMmed per
+  (icustay_id, charttime); only charttimes with all 3 components are emitted
+
+| gcs_total | count |
+|-----------|-------|
+| 3 | 60,183 |
+| 4 | 8,926 |
+| 5 | 7,354 |
+| 6 | 36,152 |
+| 7 | 43,149 |
+| 8 | 48,012 |
+| 9 | 57,611 |
+| 10 | 102,033 |
+| 11 | 114,506 |
+| 12 | 9,979 |
+| 13 | 24,303 |
+| 14 | 75,251 |
+| 15 | 357,124 |
+
+GCS range confirmed 3–15. Average GCS total ≈ 11.4 (moderately impaired to normal, expected for a mixed ICU population).
 
 ## Transformation Notes
 
 - Column names downcased from UPPERCASE MIMIC-III convention
 - Temperature items 678/223761 (Fahrenheit) converted to Celsius: (F-32)*5/9
-- MetaVision GCS recorded as three components: Eye (220739), Verbal (223900),
-  Motor (223901); CareVue records GCS total directly (198). All stored as vital_name='gcs'.
-- Lactate convenience flag added to silver.lab_events: `is_lactate = (ITEMID = 50813)`
+- GCS is a unified 3–15 total: CareVue via itemid 198 directly; MetaVision via
+  SUM(Eye 220739, Verbal 223900, Motor 223901) per (icustay_id, charttime), 
+  requiring all 3 components to be present before emitting a row
+- Ventilator-mode itemids (720, 722, 223849) are ingested in bronze.chart_events
+  but consumed by gold.patient_features directly (not emitted as vital_signs rows)
+- Lactate convenience flag in silver.lab_events: `is_lactate = (ITEMID = 50813)`
   (verified: 187,116 lactate observations in bronze)
 
 _(Aggregates only — no raw patient rows.)_

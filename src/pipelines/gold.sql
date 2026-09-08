@@ -24,9 +24,15 @@
 --   Vasopressor window: any time during the stay (not restricted to 24h)
 --   because vasopressor use is a stay-level characteristic.
 --
--- on_ventilator: TRUE if any mechanical ventilation procedure in procedure_events_mv
---   (itemids 225792 = Invasive Ventilation, 225794 = Non-Invasive Ventilation,
---    224385 = Intubation) during the ICU stay.
+-- on_ventilator: TRUE if either:
+--   (a) MetaVision: any procedure_events_mv row for the stay with
+--       itemid 225792 (Invasive Ventilation), 225794 (Non-Invasive Ventilation),
+--       or 224385 (Intubation); OR
+--   (b) CareVue / MetaVision mode chart: any chart_events row for the stay with
+--       itemid 720 (CareVue Ventilator Mode), 722 (CareVue Ventilator Type),
+--       or 223849 (MetaVision Ventilator Mode).
+--   The CareVue cohort (~40% of stays) is not captured by procedure_events_mv;
+--   the chart_events itemids fill that gap. The combined OR logic covers both eras.
 --
 -- lactate_last: most recent lactate value (lab_events itemid 50813) in stay.
 --
@@ -120,12 +126,25 @@ vasopressors AS (
   SELECT icustay_id FROM vasopressor_cv
 ),
 
--- Ventilator flag: any mechanical ventilation procedure in procedure_events_mv
-ventilator AS (
-  SELECT DISTINCT ICUSTAY_ID AS icustay_id, TRUE AS on_ventilator
+-- Ventilator flag: MetaVision procedure_events_mv (path a)
+ventilator_mv_proc AS (
+  SELECT DISTINCT ICUSTAY_ID AS icustay_id
   FROM icu_step_down.bronze.procedure_events_mv
   WHERE ITEMID IN (225792, 225794, 224385)
     AND ICUSTAY_ID IS NOT NULL
+),
+-- Ventilator flag: CareVue + MetaVision mode via chart_events (path b)
+ventilator_chart AS (
+  SELECT DISTINCT ICUSTAY_ID AS icustay_id
+  FROM icu_step_down.bronze.chart_events
+  WHERE ITEMID IN (720, 722, 223849)
+    AND ICUSTAY_ID IS NOT NULL
+),
+-- Combined: on_ventilator = TRUE if present in either path
+ventilator AS (
+  SELECT icustay_id FROM ventilator_mv_proc
+  UNION
+  SELECT icustay_id FROM ventilator_chart
 ),
 
 -- Lactate: most recent value during the stay
