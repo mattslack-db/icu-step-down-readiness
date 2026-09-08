@@ -201,6 +201,19 @@ def get_census(
     records = [_build_record(row) for row in rows]
     predictions = _call_serving(ws, records)
 
+    # Defensive guard: Databricks Model Serving preserves batch input order and
+    # the pyfunc output carries no patient id to key on, so we consume predictions
+    # positionally.  A count mismatch would silently misalign scores to patients
+    # on a clinical path — hard-fail instead.
+    if len(predictions) != len(rows):
+        raise HTTPException(
+            status_code=500,
+            detail=(
+                f"Serving endpoint returned {len(predictions)} predictions for "
+                f"{len(rows)} inputs — cannot safely map scores to patients."
+            ),
+        )
+
     # --- 3. Compute relative readiness indices ---
     raw_scores = [
         float(pred.get("readiness_score", 0.0)) for pred in predictions
@@ -210,6 +223,7 @@ def get_census(
     ]
 
     # --- 4. Build patient summaries ---
+    # Order preserved: rows[i] ↔ predictions[i] ↔ indices[i] (same batch order).
     patients: list[CensusPatient] = []
     for row, pred, idx in zip(rows, predictions, indices):
         raw_score = float(pred.get("readiness_score", 0.0))

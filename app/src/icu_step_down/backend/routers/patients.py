@@ -197,6 +197,20 @@ def get_patient(
     # --- 4. Batch-call serving endpoint; key predictions by icustay_id ---
     all_predictions = _call_serving(ws, records)
 
+    # Defensive guard: Databricks Model Serving preserves batch input order and
+    # the pyfunc output carries no patient id to key on — we zip ordered_ids with
+    # all_predictions positionally to build the id→prediction map.  A count
+    # mismatch would silently misassign scores to patients on a clinical path.
+    if len(all_predictions) != len(ordered_ids):
+        raise HTTPException(
+            status_code=500,
+            detail=(
+                f"Serving endpoint returned {len(all_predictions)} predictions for "
+                f"{len(ordered_ids)} inputs — cannot safely map scores to patients."
+            ),
+        )
+
+    # Order preserved: ordered_ids[i] ↔ all_predictions[i] (same batch order).
     predictions_by_id: dict[str, dict[str, Any]] = {
         census_id: pred
         for census_id, pred in zip(ordered_ids, all_predictions)
