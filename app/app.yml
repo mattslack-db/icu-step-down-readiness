@@ -1,0 +1,10 @@
+command: ["uvicorn", "icu_step_down.backend.app:app", "--workers", "2"]
+
+resources:
+  - name: postgres
+    postgres:
+      endpoint: projects/icu-step-down/branches/production/endpoints/primary
+      database: databricks-postgres
+  - name: icu-readiness
+    serving_endpoint:
+      name: icu-readiness
