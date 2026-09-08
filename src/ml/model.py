@@ -1,8 +1,8 @@
 """
 ICU Step-Down Readiness pyfunc model.
 
-Logged via mlflow.pyfunc.log_model(python_model="model.py") — the
-"Models from Code" pattern (no pickling).  The serving runtime executes
+Logged via mlflow.pyfunc.log_model(python_model="src/ml/model.py") — the
+"Models from Code" pattern (no pickling). The serving runtime executes
 this file verbatim; mlflow.models.set_model(ReadinessModel()) at the
 bottom tells MLflow which class to instantiate.
 
@@ -21,6 +21,7 @@ Output (per-request):  pandas DataFrame with one column "prediction"
 """
 
 import json
+from typing import Optional
 
 import mlflow
 import numpy as np
@@ -73,7 +74,7 @@ class ReadinessModel(PythonModel):
     predict:       returns readiness_score + top-N factors per row.
     """
 
-    def load_context(self, context):
+    def load_context(self, context: mlflow.pyfunc.PythonModelContext) -> None:
         import lightgbm as lgb
         import shap
 
@@ -81,15 +82,32 @@ class ReadinessModel(PythonModel):
         # TreeExplainer is fast on tree models (no sampling).
         self.explainer = shap.TreeExplainer(self.lgbm)
 
-    def predict(self, context, model_input: pd.DataFrame, params=None) -> pd.DataFrame:
+    def predict(
+        self,
+        context: mlflow.pyfunc.PythonModelContext,
+        model_input: pd.DataFrame,
+        params: Optional[dict] = None,
+    ) -> pd.DataFrame:
+        # --- guard: fail clearly on missing columns -----------------------
+        missing_cols = [c for c in FEATURE_COLS if c not in model_input.columns]
+        if missing_cols:
+            raise ValueError(
+                f"ReadinessModel.predict: input is missing required columns: "
+                f"{missing_cols}. "
+                f"Provide all {len(FEATURE_COLS)} feature columns: {FEATURE_COLS}"
+            )
+
         # --- coerce inputs ------------------------------------------------
         X = model_input[FEATURE_COLS].copy()
-        # Cast everything to numeric; non-parseable → NaN (LightGBM handles NaN natively).
         for col in FEATURE_COLS:
-            if X[col].dtype == object or str(X[col].dtype) == "boolean":
+            dtype_str = str(X[col].dtype)
+            # Covers pandas object, string, StringDtype, and boolean-as-string types.
+            if dtype_str in ("object", "string", "StringDtype", "boolean"):
                 X[col] = pd.to_numeric(X[col], errors="coerce")
             elif X[col].dtype == bool:
                 X[col] = X[col].astype(float)
+        # Cast everything to float64 so LightGBM gets a consistent array type;
+        # NaN values pass through and are handled by LightGBM's surrogate splits.
         X_arr = X.to_numpy(dtype=np.float64)
 
         # --- score --------------------------------------------------------

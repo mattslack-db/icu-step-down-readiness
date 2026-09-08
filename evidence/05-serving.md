@@ -1,115 +1,112 @@
 # Phase 5A — Serving Endpoint Status & Sample Request/Response
 
+> **v2 — model version 2 (clean eval)**: endpoint redeployed via DABs bundle.
+
 ## Endpoint summary
 
 | Field | Value |
 |---|---|
 | Name | `icu-readiness` |
 | State | `READY` / `NOT_UPDATING` |
-| Model | `icu_step_down.ml.readiness_model` version `1` |
+| Model | `icu_step_down.ml.readiness_model` version **2** |
 | Alias | `@prod` |
 | Workload size | `Small` |
 | Scale-to-zero | enabled |
 | Deployment method | DABs bundle (`resources/model_serving.yml`) |
 
-The endpoint was created via `databricks bundle deploy -t sandbox --profile icu-sandbox`.
-The bundle YAML uses `entity_version: "1"` pointing to the registered model version
-produced by the training notebook. Alias `@prod` is also set so application code can
-reference `models:/icu_step_down.ml.readiness_model@prod`.
+The endpoint was created/updated via `databricks bundle deploy -t sandbox --profile icu-sandbox`.
+The bundle YAML uses `entity_version: "2"` pointing to the registered model version produced
+by the v2 training run. Alias `@prod` is set so application code can reference
+`models:/icu_step_down.ml.readiness_model@prod`.
 
 ## Query format
 
 **Endpoint**: `POST https://fe-sandbox-icu-step-down-readiness.cloud.databricks.com/serving-endpoints/icu-readiness/invocations`
 
-**Request body**: `dataframe_records` format — one dict per patient row.
+**Request body**: `dataframe_records` format — one dict per patient row with all 30 FEATURE_COLS.
 
+## Real sample request/response 1 — single patient
+
+### Request
+```json
+{
+  "dataframe_records": [{
+    "hr_mean": 88.5, "hr_min": 72.0, "hr_max": 105.0, "hr_last": 84.0,
+    "sbp_mean": 118.3, "sbp_min": 102.0, "sbp_max": 138.0, "sbp_last": 120.0,
+    "dbp_mean": 68.2, "dbp_min": 58.0, "dbp_max": 80.0, "dbp_last": 70.0,
+    "spo2_mean": 97.4, "spo2_min": 94.0, "spo2_max": 99.0, "spo2_last": 98.0,
+    "temp_c_mean": 37.1, "temp_c_min": 36.5, "temp_c_max": 37.8, "temp_c_last": 37.2,
+    "rr_mean": 16.0, "rr_min": 12.0, "rr_max": 20.0, "rr_last": 15.0,
+    "on_vasopressors": 0, "on_ventilator": 0,
+    "gcs_last": 15, "lactate_last": 1.1, "los": 2.5, "age": 62.5
+  }]
+}
+```
+
+### Response
+```json
+{
+  "predictions": [{
+    "prediction": "{\"readiness_score\": 0.46176069029012545, \"factors\": [{\"name\": \"lactate_last\", \"direction\": \"risk\", \"magnitude\": 0.27920103767956744}, {\"name\": \"los\", \"direction\": \"supports\", \"magnitude\": 0.030412835529883702}, {\"name\": \"temp_c_min\", \"direction\": \"risk\", \"magnitude\": 0.03018657048603611}, {\"name\": \"rr_mean\", \"direction\": \"supports\", \"magnitude\": 0.026985545164322416}, {\"name\": \"spo2_last\", \"direction\": \"risk\", \"magnitude\": 0.026972034314732926}]}"
+  }]
+}
+```
+
+## Real sample request/response 2 — two contrasting patients
+
+### Request
 ```json
 {
   "dataframe_records": [
     {
-      "hr_mean": 88.5,
-      "hr_min": 72.0,
-      "hr_max": 105.0,
-      "hr_last": 84.0,
-      "sbp_mean": 118.3,
-      "sbp_min": 102.0,
-      "sbp_max": 138.0,
-      "sbp_last": 120.0,
-      "dbp_mean": 68.2,
-      "dbp_min": 58.0,
-      "dbp_max": 80.0,
-      "dbp_last": 70.0,
-      "spo2_mean": 97.4,
-      "spo2_min": 94.0,
-      "spo2_max": 99.0,
-      "spo2_last": 98.0,
-      "temp_c_mean": 37.1,
-      "temp_c_min": 36.5,
-      "temp_c_max": 37.8,
-      "temp_c_last": 37.2,
-      "rr_mean": 16.0,
-      "rr_min": 12.0,
-      "rr_max": 20.0,
-      "rr_last": 15.0,
-      "on_vasopressors": 0,
-      "on_ventilator": 0,
-      "gcs_last": 15,
-      "lactate_last": 1.1,
-      "los": 2.5,
-      "age": 62.5
-    }
-  ]
-}
-```
-
-**Response**:
-```json
-{
-  "predictions": [
-    {
-      "prediction": "{\"readiness_score\": 0.4447135290222422, \"factors\": [{\"name\": \"lactate_last\", \"direction\": \"risk\", \"magnitude\": 0.3557688611235546}, {\"name\": \"on_ventilator\", \"direction\": \"risk\", \"magnitude\": 0.06148460309168106}, {\"name\": \"spo2_last\", \"direction\": \"risk\", \"magnitude\": 0.04026642407259467}, {\"name\": \"gcs_last\", \"direction\": \"risk\", \"magnitude\": 0.035117962891272}, {\"name\": \"dbp_min\", \"direction\": \"supports\", \"magnitude\": 0.030207761876462156}]}"
-    }
-  ]
-}
-```
-
-## Live CLI test — two contrasting patients
-
-```bash
-databricks serving-endpoints query icu-readiness --profile icu-sandbox --json '{
-  "dataframe_records": [
-    { <healthy young patient: lactate=0.4, off-vent, GCS=15, age=38> },
-    { <critically ill: lactate=6.2, on-vent+vasopressors, GCS=8, age=78> }
-  ]
-}'
-```
-
-**Response**:
-```json
-{
-  "predictions": [
-    {
-      "prediction": "{\"readiness_score\": 0.4366819805954576, \"factors\": [{\"name\": \"lactate_last\", \"direction\": \"risk\", \"magnitude\": 0.4742568430719996}, {\"name\": \"age\", \"direction\": \"supports\", \"magnitude\": 0.0755231643072127}, {\"name\": \"rr_mean\", \"direction\": \"supports\", \"magnitude\": 0.07442398991668205}, {\"name\": \"on_ventilator\", \"direction\": \"risk\", \"magnitude\": 0.053011180887023994}, {\"name\": \"spo2_last\", \"direction\": \"risk\", \"magnitude\": 0.03936991405488551}]}"
+      "hr_mean": 68.0, "hr_min": 58.0, "hr_max": 80.0, "hr_last": 66.0,
+      "sbp_mean": 122.0, "sbp_min": 112.0, "sbp_max": 135.0, "sbp_last": 120.0,
+      "dbp_mean": 72.0, "dbp_min": 65.0, "dbp_max": 80.0, "dbp_last": 72.0,
+      "spo2_mean": 99.0, "spo2_min": 98.0, "spo2_max": 100.0, "spo2_last": 99.0,
+      "temp_c_mean": 36.8, "temp_c_min": 36.5, "temp_c_max": 37.1, "temp_c_last": 36.9,
+      "rr_mean": 13.0, "rr_min": 11.0, "rr_max": 15.0, "rr_last": 12.0,
+      "on_vasopressors": 0, "on_ventilator": 0,
+      "gcs_last": 15, "lactate_last": 0.4, "los": 1.0, "age": 38.0
     },
     {
-      "prediction": "{\"readiness_score\": 0.5347027780485188, \"factors\": [{\"name\": \"lactate_last\", \"direction\": \"risk\", \"magnitude\": 0.3017705869567269}, {\"name\": \"spo2_last\", \"direction\": \"supports\", \"magnitude\": 0.2302208792532516}, {\"name\": \"rr_min\", \"direction\": \"risk\", \"magnitude\": 0.14217104073672632}, {\"name\": \"sbp_mean\", \"direction\": \"supports\", \"magnitude\": 0.08012394973570648}, {\"name\": \"age\", \"direction\": \"risk\", \"magnitude\": 0.08003980042366206}]}"
+      "hr_mean": 110.0, "hr_min": 95.0, "hr_max": 130.0, "hr_last": 115.0,
+      "sbp_mean": 88.0, "sbp_min": 72.0, "sbp_max": 100.0, "sbp_last": 85.0,
+      "dbp_mean": 52.0, "dbp_min": 42.0, "dbp_max": 62.0, "dbp_last": 50.0,
+      "spo2_mean": 91.0, "spo2_min": 86.0, "spo2_max": 95.0, "spo2_last": 88.0,
+      "temp_c_mean": 38.9, "temp_c_min": 38.2, "temp_c_max": 39.5, "temp_c_last": 39.2,
+      "rr_mean": 24.0, "rr_min": 20.0, "rr_max": 30.0, "rr_last": 26.0,
+      "on_vasopressors": 1, "on_ventilator": 1,
+      "gcs_last": 8, "lactate_last": 6.2, "los": 7.5, "age": 78.0
     }
   ]
 }
 ```
 
-> ⚠️ **Calibration warning**: the critically ill patient (score=0.53) scores HIGHER than
-> the healthy patient (score=0.44). All scores cluster 0.43–0.54 — the class-weight
-> compression effect described in the metrics file. The `readiness_score` is a relative
-> ranking, not a calibrated probability. See `phase-5a-report.md` for guidance.
+### Response
+```json
+{
+  "predictions": [
+    {
+      "prediction": "{\"readiness_score\": 0.5262129781262446, \"factors\": [{\"name\": \"lactate_last\", \"direction\": \"risk\", \"magnitude\": 0.21225860789450382}, {\"name\": \"age\", \"direction\": \"supports\", \"magnitude\": 0.16402361662137746}, {\"name\": \"rr_last\", \"direction\": \"supports\", \"magnitude\": 0.06620151729138346}, {\"name\": \"on_ventilator\", \"direction\": \"risk\", \"magnitude\": 0.029775666674647674}, {\"name\": \"spo2_last\", \"direction\": \"risk\", \"magnitude\": 0.02438518442949537}]}"
+    },
+    {
+      "prediction": "{\"readiness_score\": 0.44361507823076346, \"factors\": [{\"name\": \"lactate_last\", \"direction\": \"risk\", \"magnitude\": 0.2261717622648495}, {\"name\": \"rr_min\", \"direction\": \"risk\", \"magnitude\": 0.11120902604512867}, {\"name\": \"spo2_last\", \"direction\": \"supports\", \"magnitude\": 0.1058198567379225}, {\"name\": \"hr_last\", \"direction\": \"risk\", \"magnitude\": 0.07229505553227629}, {\"name\": \"los\", \"direction\": \"risk\", \"magnitude\": 0.03347291598173252}]}"
+    }
+  ]
+}
+```
+
+**Clinical ordering (v2)**: healthy young patient (score=0.526) > critically ill (score=0.444) —
+correct direction. v1 had this inverted due to eval-set leak.
 
 ## Endpoint infrastructure
 
 - Serving endpoint created and managed by DABs bundle (`resources/model_serving.yml`)
-- Serving entity: `icu_step_down.ml.readiness_model`, version `1`
-- Traffic: 100% to `readiness_model-1`
+- Serving entity: `icu_step_down.ml.readiness_model`, version `2`
+- Traffic: 100% to `readiness_model-2`
 - Verified `state.ready == "READY"` and `state.config_update == "NOT_UPDATING"` before querying
 - Scale-to-zero enabled; first query after idle period will have cold-start latency (~30s)
+- `.ipynb` files excluded from bundle sync via `databricks.yml` `sync.exclude` to avoid conflict with `.py` notebooks
 
 ## Consuming the endpoint (app / narrative)
 
@@ -126,7 +123,7 @@ response = requests.post(
 )
 raw = response.json()["predictions"][0]["prediction"]
 result = json.loads(raw)
-score = result["readiness_score"]   # float in ~[0.43, 0.97]
+score = result["readiness_score"]   # float; class-weight compression → ~0.44–0.97 range
 factors = result["factors"]          # list of {name, direction, magnitude}
 ```
 
@@ -136,10 +133,13 @@ factors = result["factors"]          # list of {name, direction, magnitude}
 - `magnitude`: absolute SHAP value (higher = more influential)
 - Returns top-5 by magnitude
 
+**Missing-column guard**: if any of the 30 FEATURE_COLS are absent, `ReadinessModel.predict`
+raises `ValueError` naming the missing columns — no silent KeyError.
+
 ## Notes on re-deployment
 
-To update the model version after retraining:
-1. Retrain — new version is registered to `icu_step_down.ml.readiness_model`
+To update after retraining:
+1. Retrain — new version registered to `icu_step_down.ml.readiness_model`
 2. Set alias: `client.set_registered_model_alias(FULL_NAME, "prod", new_version)`
-3. Update `resources/model_serving.yml` entity_version and served_model_name
+3. Update `resources/model_serving.yml` — `entity_version` and `served_model_name`
 4. Re-run `databricks bundle deploy -t sandbox --profile icu-sandbox`

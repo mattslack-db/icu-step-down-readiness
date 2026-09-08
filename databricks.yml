@@ -4,6 +4,10 @@ bundle:
 include:
   - resources/*.yml
 
+sync:
+  exclude:
+    - "**/*.ipynb"   # keep .py as canonical; .ipynb is for local viewing only
+
 variables:
   catalog:
     description: Unity Catalog catalog name for all schemas (bronze, silver, gold, ml).

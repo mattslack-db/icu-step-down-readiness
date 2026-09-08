@@ -6,10 +6,10 @@ resources:
       config:
         served_entities:
           - entity_name: ${var.catalog}.ml.readiness_model
-            entity_version: "1"
+            entity_version: "2"
             scale_to_zero_enabled: true
             workload_size: Small
         traffic_config:
           routes:
-            - served_model_name: readiness_model-1
+            - served_model_name: readiness_model-2
               traffic_percentage: 100
