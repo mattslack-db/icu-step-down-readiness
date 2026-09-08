@@ -1,0 +1,15 @@
+resources:
+  model_serving_endpoints:
+    icu_readiness_endpoint:
+      name: icu-readiness
+      description: "ICU step-down readiness classifier — returns P(safe step-down) + SHAP factor explanations."
+      config:
+        served_entities:
+          - entity_name: ${var.catalog}.ml.readiness_model
+            entity_version: "1"
+            scale_to_zero_enabled: true
+            workload_size: Small
+        traffic_config:
+          routes:
+            - served_model_name: readiness_model-1
+              traffic_percentage: 100
