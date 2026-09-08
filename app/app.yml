@@ -1,10 +1,24 @@
 command: ["uvicorn", "icu_step_down.backend.app:app", "--workers", "2"]
 
+# Lakebase postgres resource — correct three-field format per the app manifest.
+# The platform grants the app SP CAN_CONNECT_AND_CREATE and auto-injects:
+#   PGHOST, PGPORT, PGDATABASE, PGUSER, PGSSLMODE, LAKEBASE_ENDPOINT
+# We explicitly set PGENDPOINT (= same path as LAKEBASE_ENDPOINT) for local-dev
+# compat and DATABASE_NAME as a fallback.
+env:
+  - name: PGENDPOINT
+    value: "projects/icu-step-down/branches/production/endpoints/primary"
+  - name: LAKEBASE_ENDPOINT
+    value: "projects/icu-step-down/branches/production/endpoints/primary"
+  - name: DATABASE_NAME
+    value: "databricks_postgres"
+
 resources:
   - name: postgres
     postgres:
-      endpoint: projects/icu-step-down/branches/production/endpoints/primary
-      database: databricks-postgres
+      project: projects/icu-step-down
+      branch: projects/icu-step-down/branches/production
+      database: projects/icu-step-down/branches/production/databases/databricks-postgres
   - name: icu-readiness
     serving_endpoint:
       name: icu-readiness

@@ -13,7 +13,7 @@ from typing import Annotated, Any, AsyncGenerator, TypeAlias
 
 from databricks.sdk import WorkspaceClient
 from fastapi import FastAPI, Request
-from pydantic import Field
+from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from sqlalchemy import Engine, create_engine, event
 from sqlmodel import Session, SQLModel, text
@@ -38,14 +38,23 @@ class DatabaseConfig(BaseSettings):
     database_name: str = Field(
         description="Postgres database name to connect to",
         default="databricks_postgres",
-        validation_alias="DATABASE_NAME",
+        # Databricks Apps injects PGDATABASE; local dev uses DATABASE_NAME.
+        validation_alias=AliasChoices("PGDATABASE", "DATABASE_NAME"),
     )
     postgres_endpoint: str = Field(
         description=(
             "Full Lakebase endpoint resource path, e.g. "
             "projects/icu-step-down/branches/production/endpoints/primary"
         ),
-        validation_alias="PGENDPOINT",
+        # Databricks Apps injects LAKEBASE_ENDPOINT; local dev uses PGENDPOINT.
+        validation_alias=AliasChoices("LAKEBASE_ENDPOINT", "PGENDPOINT"),
+    )
+    # Platform-injected host (PGHOST); when set, skip the ws.postgres.get_endpoint()
+    # API call and use this host directly.
+    pg_host: str | None = Field(
+        default=None,
+        validation_alias="PGHOST",
+        description="Postgres host (auto-injected by Databricks Apps postgres resource)",
     )
 
 
@@ -60,7 +69,7 @@ def _get_dev_db_port() -> int | None:
     Returns None when PGENDPOINT is set — this project connects directly to
     the Lakebase Postgres endpoint and does not use the apx embedded PGLite DB.
     """
-    if os.environ.get("PGENDPOINT"):
+    if os.environ.get("PGENDPOINT") or os.environ.get("LAKEBASE_ENDPOINT"):
         # Always use Lakebase when a real endpoint is configured; ignore the
         # embedded PGLite that apx spins up for simpler scaffold projects.
         return None
@@ -79,35 +88,44 @@ def _get_host_and_cred(
     """
     Fetch the Lakebase endpoint host and generate a fresh OAuth token.
 
+    When the Databricks Apps platform has injected PGHOST (via the postgres
+    resource), uses that directly to avoid the get_endpoint() API call.
+
     Returns:
         (host, token) tuple.
 
     Raises:
         RuntimeError if the endpoint or credential cannot be fetched.
     """
-    try:
-        endpoint = ws.postgres.get_endpoint(db_config.postgres_endpoint)
-    except Exception as exc:
-        raise RuntimeError(
-            f"Failed to get Lakebase endpoint {db_config.postgres_endpoint!r}: {exc}"
-        ) from exc
+    # Fast path: PGHOST injected by the Databricks Apps platform postgres resource
+    if db_config.pg_host:
+        host = db_config.pg_host
+        logger.info("Using platform-injected PGHOST: %s", host)
+    else:
+        # Resolve host from the endpoint resource (local dev path)
+        try:
+            endpoint = ws.postgres.get_endpoint(db_config.postgres_endpoint)
+        except Exception as exc:
+            raise RuntimeError(
+                f"Failed to get Lakebase endpoint {db_config.postgres_endpoint!r}: {exc}"
+            ) from exc
 
-    # Navigate endpoint.status.hosts.host — accommodate both dict and dataclass
-    try:
-        status = endpoint.status
-        hosts = status.hosts if hasattr(status, "hosts") else {}
-        if isinstance(hosts, dict):
-            host = hosts.get("host", "")
-        else:
-            host = getattr(hosts, "host", "")
-    except Exception:
-        host = ""
+        # Navigate endpoint.status.hosts.host — accommodate both dict and dataclass
+        try:
+            status = endpoint.status
+            hosts = status.hosts if hasattr(status, "hosts") else {}
+            if isinstance(hosts, dict):
+                host = hosts.get("host", "")
+            else:
+                host = getattr(hosts, "host", "")
+        except Exception:
+            host = ""
 
-    if not host:
-        raise RuntimeError(
-            f"Lakebase endpoint {db_config.postgres_endpoint!r} returned no host. "
-            f"endpoint.status = {getattr(endpoint, 'status', None)}"
-        )
+        if not host:
+            raise RuntimeError(
+                f"Lakebase endpoint {db_config.postgres_endpoint!r} returned no host. "
+                f"endpoint.status = {getattr(endpoint, 'status', None)}"
+            )
 
     try:
         cred = ws.postgres.generate_database_credential(
@@ -170,44 +188,78 @@ def create_db_engine(
     """
     Create a SQLAlchemy engine connected to the Lakebase instance.
 
-    In production mode:
-    - The engine URL contains a dummy empty password.
-    - A ``do_connect`` event listener refreshes the OAuth token before
-      every new connection is opened, honoring the 1-hour expiry.
+    Production mode: uses a ``creator=`` function that calls
+    ``generate_database_credential`` on every new connection to get a
+    fresh OAuth token and opens the psycopg3 connection directly.
+    This bypasses SQLAlchemy URL-based credential handling entirely.
+
+    Dev mode: connects to the local embedded PGLite database.
     """
+    import psycopg as _psycopg  # type: ignore[import]
+
     dev_port = _get_dev_db_port()
 
-    # Fetch the initial host (and a throwaway token to verify connectivity).
-    initial_host = ""
-    if not dev_port:
-        initial_host, _ = _get_host_and_cred(db_config, ws)
+    if dev_port:
+        engine_url = _build_engine_url(db_config, ws, dev_port, "")
+        engine = create_engine(
+            engine_url,
+            pool_size=4,
+            pool_recycle=45 * 60,
+        )
+        return engine
 
-    engine_url = _build_engine_url(db_config, ws, dev_port, initial_host)
+    # Production: resolve host once at startup
+    initial_host, _ = _get_host_and_cred(db_config, ws)
+    # Prefer platform-injected host if available and non-empty
+    host = db_config.pg_host or initial_host
+    port = db_config.port
+    dbname = db_config.database_name
+    endpoint = db_config.postgres_endpoint
+    # The username is the SP client_id (or user email in local dev).
+    # In deployed Databricks Apps, ws.config.client_id is the app SP's client_id UUID.
+    username = (
+        ws.config.client_id
+        if ws.config.client_id
+        else ws.current_user.me().user_name
+    )
+    logger.info("Lakebase engine: host=%s dbname=%s username=%s", host, dbname, username)
 
-    engine_kwargs: dict[str, Any] = {
-        "pool_size": 4,
-        "pool_recycle": 45 * 60,
-    }
+    def _creator():
+        """Called by SQLAlchemy pool for every new physical connection.
 
-    if not dev_port:
-        engine_kwargs["connect_args"] = {"sslmode": "require"}
+        Generates a fresh Lakebase OAuth token via generate_database_credential
+        and opens a direct psycopg3 connection.  This bypasses SQLAlchemy URL
+        credential handling entirely, which avoids the cparams override issue
+        seen with do_connect + psycopg3 AdaptersMap context.
+        """
+        try:
+            cred = ws.postgres.generate_database_credential(endpoint=endpoint)
+            token = cred.token or ""
+        except Exception as exc:
+            logger.error("Failed to generate Lakebase credential: %s", exc)
+            raise RuntimeError(
+                f"Failed to generate Lakebase credential: {exc}"
+            ) from exc
 
-    engine = create_engine(engine_url, **engine_kwargs)
+        if not token:
+            raise RuntimeError("generate_database_credential returned empty token.")
 
-    if not dev_port:
-        # Refresh the credential on every new physical connection.
-        # SQLAlchemy fires ``do_connect`` just before psycopg opens the socket.
-        @event.listens_for(engine, "do_connect")
-        def _before_connect(dialect, conn_rec, cargs, cparams):  # type: ignore[misc]
-            try:
-                cred = ws.postgres.generate_database_credential(
-                    endpoint=db_config.postgres_endpoint
-                )
-                cparams["password"] = cred.token or ""
-            except Exception as exc:
-                logger.error("Failed to refresh Lakebase credential: %s", exc)
-                raise
+        return _psycopg.connect(
+            host=host,
+            port=port,
+            dbname=dbname,
+            user=username,
+            password=token,
+            sslmode="require",
+        )
 
+    # Use dummy URL so SQLAlchemy knows the dialect; actual connections via creator=
+    engine = create_engine(
+        "postgresql+psycopg://",
+        creator=_creator,
+        pool_size=4,
+        pool_recycle=45 * 60,
+    )
     return engine
 
 
