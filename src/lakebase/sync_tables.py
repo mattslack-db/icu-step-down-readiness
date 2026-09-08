@@ -147,11 +147,23 @@ def catalog_exists() -> bool:
         capture_output=True,
         text=True,
     )
+    if result.returncode != 0:
+        print(
+            f"  ERROR: 'databricks catalogs list' failed (rc={result.returncode}):\n"
+            f"  {result.stderr.strip()}",
+            file=sys.stderr,
+        )
+        sys.exit(1)
     catalogs = json.loads(result.stdout) if result.stdout.strip() else []
     return any(c.get("name") == LAKEBASE_UC_CATALOG for c in catalogs)
 
 
 def synced_table_exists(target: str) -> bool:
+    """Return True if the synced table exists, False if genuinely not found.
+
+    Any non-zero exit that is NOT a recognisable "not found" error is treated
+    as a hard failure (auth/network/unexpected), not a missing table.
+    """
     result = subprocess.run(
         [
             "databricks",
@@ -166,7 +178,25 @@ def synced_table_exists(target: str) -> bool:
         capture_output=True,
         text=True,
     )
-    return result.returncode == 0
+    if result.returncode == 0:
+        return True
+    # Treat only genuine "resource not found" as False.
+    stderr_lower = result.stderr.lower()
+    not_found_signals = (
+        "resource_does_not_exist",
+        "does not exist",
+        "not found",
+        "404",
+    )
+    if any(sig in stderr_lower for sig in not_found_signals):
+        return False
+    # Any other non-zero exit (auth failure, network error, …) is a real error.
+    print(
+        f"  ERROR: 'get-synced-table {target}' failed unexpectedly "
+        f"(rc={result.returncode}):\n  {result.stderr.strip()}",
+        file=sys.stderr,
+    )
+    sys.exit(1)
 
 
 def synced_table_state(target: str) -> str:
@@ -278,7 +308,11 @@ def _wait_for_online() -> None:
             return
         print(f"  Waiting {POLL_INTERVAL_S}s ...")
         time.sleep(POLL_INTERVAL_S)
-    print("  WARNING: Timed out waiting for synced tables to go ONLINE.", file=sys.stderr)
+    print(
+        "  ERROR: Timed out waiting for synced tables to go ONLINE.",
+        file=sys.stderr,
+    )
+    sys.exit(1)
 
 
 # ---------------------------------------------------------------------------
@@ -287,6 +321,7 @@ def _wait_for_online() -> None:
 
 
 def main() -> None:
+    global PROFILE  # noqa: PLW0603
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--profile", default=PROFILE, help="Databricks CLI profile"
@@ -295,8 +330,6 @@ def main() -> None:
         "--wait", action="store_true", help="Block until all synced tables are ONLINE"
     )
     args = parser.parse_args()
-
-    global PROFILE  # noqa: PLW0603
     PROFILE = args.profile
 
     print("=== Step 1: Ensure Lakebase project ===")
