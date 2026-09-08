@@ -247,20 +247,29 @@ LEFT JOIN bounce_back bb
 -- "Current" ICU patients for operational scoring.
 --
 -- MIMIC-III is retrospective; very few stays have outtime IS NULL. Therefore:
--- Decision: use the 40 most recent ICU stays by intime as the census snapshot.
--- This provides a non-empty, representative population for the app to score.
--- The app can display these as the "active" census list for demo purposes.
--- (Documented in SQL comment per brief requirements.)
+-- Decision: use the 40 most recent ICU stays by intime that have POPULATED
+-- vital aggregates (hr_mean IS NOT NULL AND spo2_mean IS NOT NULL AND
+-- gcs_last IS NOT NULL). This ensures the census always contains stays with
+-- rich clinical data for the app's scoring and detail views.
+-- 36,518 of 61,532 stays have hr_mean populated; the filter simply skips
+-- the small fraction of very-short stays where chart_events were not recorded.
+-- (Phase 2 amendment: previously selected most-recent-40 unconditionally,
+--  which happened to return 37/40 rows with NULL vital aggregates.)
 -- ---------------------------------------------------------------------------
 CREATE OR REFRESH MATERIALIZED VIEW icu_step_down.gold.census
 AS
-WITH recent_stays AS (
-  SELECT icustay_id
-  FROM icu_step_down.silver.icu_stays
-  ORDER BY intime DESC
+WITH recent_stays_with_vitals AS (
+  SELECT s.icustay_id
+  FROM icu_step_down.silver.icu_stays s
+  JOIN icu_step_down.gold.patient_features pf
+    ON pf.icustay_id = s.icustay_id
+  WHERE pf.hr_mean  IS NOT NULL
+    AND pf.spo2_mean IS NOT NULL
+    AND pf.gcs_last  IS NOT NULL
+  ORDER BY s.intime DESC
   LIMIT 40
 )
 SELECT pf.*
 FROM icu_step_down.gold.patient_features pf
-JOIN recent_stays rs
+JOIN recent_stays_with_vitals rs
   ON rs.icustay_id = pf.icustay_id;

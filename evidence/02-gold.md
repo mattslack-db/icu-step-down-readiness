@@ -42,11 +42,27 @@ stay begins within 72h (no bounce-back). Label=0 for still-in-ICU or bounce-back
 Note: 97/3 imbalance is expected for MIMIC-III (retrospective; most stays ended
 successfully). ML training phase will need class-weighting or SMOTE.
 
-## gold.census — Design Decision
+## gold.census — Design Decision (amended Phase 2)
 
 MIMIC-III is fully retrospective; `outtime IS NULL` returns ~0 rows. Therefore the
-census is defined as the 40 most recent ICU stays by intime, providing a non-empty
-representative snapshot for the app's operational scoring view.
+census is defined as the 40 most recent ICU stays **by intime that have populated
+vital aggregates** (`hr_mean IS NOT NULL AND spo2_mean IS NOT NULL AND gcs_last IS NOT NULL`),
+providing a non-empty representative snapshot with rich clinical data for the app's
+operational scoring and patient-detail views.
+
+**Amendment (2026-09-08):** The original definition selected the 40 most-recent stays
+unconditionally; those particular stays happened to be very short admissions with no
+scoped chart_events, leaving 37/40 rows with NULL vital aggregates. 36,518 of 61,532
+stays have `hr_mean` populated. The filter simply skips the small fraction of very-short
+stays where vitals were not charted to the system.
+
+**Verification (post-amendment):**
+
+```sql
+SELECT COUNT(*), COUNT(hr_mean), COUNT(spo2_mean), COUNT(gcs_last)
+FROM icu_step_down.gold.census
+-- => 40, 40, 40, 40
+```
 
 ## Sample Rows — gold.patient_features (5 rows, aggregates only)
 

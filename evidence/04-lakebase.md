@@ -193,8 +193,16 @@ ORDER BY table_name;
 ```sql
 SELECT COUNT(*) FROM mimic_iii.census;          -- => 40  ✓ matches UC gold
 SELECT COUNT(*) FROM mimic_iii.patient_features; -- => 61532  ✓ matches UC gold
-SELECT COUNT(*) FROM mimic_iii.census_vitals;    -- => 711  (scoped from 21.7M)
+SELECT COUNT(*) FROM mimic_iii.census_vitals;    -- => 16045  (scoped from 21.7M)
 ```
+
+**Note (Phase 2 amendment, 2026-09-08):** `census` and `census_vitals` were refreshed to
+reflect the updated `gold.census` definition (vitals-populated stays only). The census
+MV was recreated via pipeline; `gold.census_vitals` was dropped and recreated (DROP +
+CREATE AS SELECT); both synced tables were deleted and recreated via `sync_tables.py`.
+Verification confirms `mimic_iii.census` has 40 rows with 40/40/40 hr_mean / spo2_mean /
+gcs_last populated. `census_vitals` grew from 711 to 16,045 rows because the new census
+stays have extensive vital charting (vs. the prior short-stay population).
 
 ### Case-Sensitive Column Sample — census
 
