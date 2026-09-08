@@ -14,12 +14,13 @@
 
 ### Status log
 - 2026-09-08T08:13 — deployment created, state `Pending`, create transaction `in_progress`.
+- 2026-09-08T08:2x — state `Active`, create transaction `success` ([GH run 34203339300](https://github.com/databricks-field-eng/fe-vending-machine/actions/runs/34203339300)).
 
 ### Workspace URL
-- _pending provisioning_
+- `https://fe-sandbox-icu-step-down-readiness.cloud.databricks.com`
 
 ### CLI profile
-- _to be configured once workspace is live_
+- Profile name: `icu-sandbox` (OAuth U2M) — configured via `databricks auth login`.
 
 ## GitHub repo
 - _pending (Task 0.2)_
