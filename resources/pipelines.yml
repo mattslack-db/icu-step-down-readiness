@@ -1,0 +1,17 @@
+resources:
+  pipelines:
+    icu_step_down_pipeline:
+      name: icu-step-down-readiness-medallion
+      catalog: ${var.catalog}
+      schema: bronze
+      serverless: true
+      channel: CURRENT
+      libraries:
+        - file:
+            path: ../src/pipelines/bronze.sql
+        - file:
+            path: ../src/pipelines/silver.sql
+        - file:
+            path: ../src/pipelines/gold.sql
+      configuration:
+        pipelines.clusterShutdown.enabled: "false"
