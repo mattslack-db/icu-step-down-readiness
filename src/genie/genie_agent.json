@@ -1,0 +1,252 @@
+{
+  "version": 2,
+  "config": {
+    "sample_questions": [
+      {
+        "id": "a0000000000000000000000000000001",
+        "question": ["How many current ICU patients are ready for step-down?"]
+      },
+      {
+        "id": "a0000000000000000000000000000002",
+        "question": ["What is the average ICU length of stay by readiness band?"]
+      },
+      {
+        "id": "a0000000000000000000000000000003",
+        "question": ["How many current patients are on vasopressors and on a ventilator at the same time?"]
+      },
+      {
+        "id": "a0000000000000000000000000000004",
+        "question": ["What is the average heart rate and GCS for patients over 65?"]
+      },
+      {
+        "id": "a0000000000000000000000000000005",
+        "question": ["What fraction of ICU stays had a bounce-back within 72 hours?"]
+      }
+    ]
+  },
+  "data_sources": {
+    "tables": [
+      {
+        "identifier": "icu_step_down.gold.census",
+        "description": ["Current ICU patient census with 40 active patients. Use this table for questions about 'current', 'today', or 'active' ICU patients. Key booleans: on_vasopressors, on_ventilator. los = length of stay in days (string). gcs_last = Glasgow Coma Scale total 3-15. icustay_id joins to readiness_training_set for outcome labels."],
+        "column_configs": [
+          {
+            "column_name": "age",
+            "description": ["Patient age in years at ICU admission."],
+            "synonyms": ["patient age", "age in years"]
+          },
+          {
+            "column_name": "dbp_mean",
+            "description": ["Mean diastolic blood pressure (mmHg) over the 24-hour window. NULL for most census patients."]
+          },
+          {
+            "column_name": "gcs_last",
+            "description": ["Glasgow Coma Scale TOTAL score at last measurement. Range 3-15: 15 = fully alert, 3 = deep coma. Higher is better. This is the total score, not a sub-score."],
+            "synonyms": ["GCS", "glasgow coma scale", "consciousness score", "coma score"]
+          },
+          {
+            "column_name": "hadm_id",
+            "description": ["Hospital admission identifier."],
+            "exclude": true
+          },
+          {
+            "column_name": "hr_mean",
+            "description": ["Mean heart rate (beats per minute) over the 24-hour window."],
+            "synonyms": ["heart rate", "pulse", "HR"]
+          },
+          {
+            "column_name": "icustay_id",
+            "description": ["ICU stay identifier. Joins to readiness_training_set for outcome/readiness data."],
+            "synonyms": ["stay ID", "ICU stay"]
+          },
+          {
+            "column_name": "lactate_last",
+            "description": ["Most recent lactate (mmol/L). Elevated lactate (>2.0) may indicate circulatory insufficiency. NULL when not measured."],
+            "synonyms": ["lactate", "blood lactate", "lactic acid"]
+          },
+          {
+            "column_name": "los",
+            "description": ["ICU length of stay in DAYS stored as string. CAST to DOUBLE for arithmetic. Example: 3.10 = 3.1 days."],
+            "synonyms": ["length of stay", "LOS", "days in ICU", "ICU days"]
+          },
+          {
+            "column_name": "on_vasopressors",
+            "description": ["True if the patient is currently on vasopressor drugs (norepinephrine, epinephrine, dopamine). Patients on vasopressors are generally not candidates for step-down."],
+            "synonyms": ["vasopressors", "pressors", "vasopressor support"],
+            "enable_entity_matching": true
+          },
+          {
+            "column_name": "on_ventilator",
+            "description": ["True if the patient is currently on mechanical ventilation. Patients on ventilators are generally not candidates for step-down."],
+            "synonyms": ["ventilator", "ventilated", "mechanical ventilation", "intubated"],
+            "enable_entity_matching": true
+          },
+          {
+            "column_name": "rr_mean",
+            "description": ["Mean respiratory rate (breaths per minute) over the 24-hour window."],
+            "synonyms": ["respiratory rate", "breathing rate", "RR"]
+          },
+          {
+            "column_name": "sbp_mean",
+            "description": ["Mean systolic blood pressure (mmHg) over the 24-hour window."],
+            "synonyms": ["systolic blood pressure", "SBP", "blood pressure"]
+          },
+          {
+            "column_name": "spo2_mean",
+            "description": ["Mean oxygen saturation (%) over the 24-hour window."],
+            "synonyms": ["SpO2", "oxygen saturation", "O2 sat"]
+          },
+          {
+            "column_name": "subject_id",
+            "description": ["Patient identifier."],
+            "exclude": true
+          },
+          {
+            "column_name": "temp_c_mean",
+            "description": ["Mean body temperature in Celsius over the 24-hour window."],
+            "synonyms": ["temperature", "body temp", "temp"]
+          }
+        ]
+      },
+      {
+        "identifier": "icu_step_down.gold.readiness_training_set",
+        "description": ["Historical ICU stays (61,532 rows) with 24-hour vital aggregates and a step-down readiness label. readiness_label=1 means the patient was safely discharged from ICU (no bounce-back, step-down ready). readiness_label=0 means the patient returned to ICU within 72 hours (bounce-back) or was not ready. ~97% label=1. Use for readiness outcome analysis, LOS by readiness band, vitals by age group, and bounce-back rates. icustay_id joins to census for current patients."],
+        "column_configs": [
+          {
+            "column_name": "age",
+            "description": ["Patient age in years at ICU admission."],
+            "synonyms": ["patient age", "age in years"]
+          },
+          {
+            "column_name": "gcs_last",
+            "description": ["Glasgow Coma Scale TOTAL score at last measurement. Range 3-15: 15=fully alert, 3=deep coma. Higher is better. NULL for ~53% of stays."],
+            "synonyms": ["GCS", "glasgow coma scale", "consciousness score"]
+          },
+          {
+            "column_name": "hadm_id",
+            "description": ["Hospital admission identifier."],
+            "exclude": true
+          },
+          {
+            "column_name": "hr_mean",
+            "description": ["Mean heart rate (bpm) over the first 24 hours. NULL for ~41% of stays."],
+            "synonyms": ["heart rate", "pulse", "HR"]
+          },
+          {
+            "column_name": "icustay_id",
+            "description": ["ICU stay identifier. Joins to census (current patients) and silver.vital_signs (time-series)."],
+            "synonyms": ["stay ID", "ICU stay"]
+          },
+          {
+            "column_name": "lactate_last",
+            "description": ["Last lactate measurement (mmol/L). NULL for ~39% of stays."],
+            "synonyms": ["lactate", "blood lactate", "lactic acid"]
+          },
+          {
+            "column_name": "los",
+            "description": ["ICU length of stay in DAYS stored as string. CAST to DOUBLE for arithmetic. NULL for 10 rows."],
+            "synonyms": ["length of stay", "LOS", "days in ICU", "ICU days"]
+          },
+          {
+            "column_name": "on_vasopressors",
+            "description": ["True if the patient required vasopressor support during the ICU stay."],
+            "synonyms": ["vasopressors", "pressors"],
+            "enable_entity_matching": true
+          },
+          {
+            "column_name": "on_ventilator",
+            "description": ["True if the patient required mechanical ventilation during the ICU stay."],
+            "synonyms": ["ventilator", "ventilated", "mechanical ventilation"],
+            "enable_entity_matching": true
+          },
+          {
+            "column_name": "readiness_label",
+            "description": ["Step-down readiness outcome. 1=safe step-down (no bounce-back). 0=returned to ICU within 72 hours (bounce-back). 97% of stays have label=1 (1826 bounce-back, 59706 ready)."],
+            "synonyms": ["readiness", "step-down outcome", "ready for step-down", "bounce-back", "label", "readiness band"],
+            "enable_entity_matching": true
+          },
+          {
+            "column_name": "sbp_mean",
+            "description": ["Mean systolic blood pressure (mmHg) over the first 24 hours."],
+            "synonyms": ["systolic blood pressure", "SBP"]
+          },
+          {
+            "column_name": "subject_id",
+            "description": ["Patient identifier."],
+            "exclude": true
+          }
+        ]
+      },
+      {
+        "identifier": "icu_step_down.silver.vital_signs",
+        "description": ["Time-series vital sign measurements. 21.7 million rows — one row per measurement. Columns: icustay_id, charttime, vital_name (hr/sbp/dbp/spo2/temp_c/rr/gcs), value (string, CAST to DOUBLE). Always filter by icustay_id or charttime to avoid full-table scans. Join to census for current patients or to readiness_training_set for historical cohorts."],
+        "column_configs": [
+          {
+            "column_name": "charttime",
+            "description": ["Timestamp when the vital was recorded."],
+            "synonyms": ["measurement time", "chart time", "recorded at"]
+          },
+          {
+            "column_name": "icustay_id",
+            "description": ["ICU stay identifier. Join to census or readiness_training_set to filter by cohort."],
+            "synonyms": ["stay ID", "ICU stay"]
+          },
+          {
+            "column_name": "subject_id",
+            "description": ["Patient identifier."],
+            "exclude": true
+          },
+          {
+            "column_name": "value",
+            "description": ["The measured vital value (string). CAST to DOUBLE for numeric operations."],
+            "synonyms": ["measurement", "reading", "vital value"]
+          },
+          {
+            "column_name": "vital_name",
+            "description": ["The vital sign type. Values: hr (heart rate bpm), sbp (systolic BP mmHg), dbp (diastolic BP mmHg), spo2 (O2 saturation %), temp_c (temperature Celsius), rr (respiratory rate breaths/min), gcs (Glasgow Coma Scale total)."],
+            "synonyms": ["vital type", "vital sign name", "measurement type"],
+            "enable_entity_matching": true,
+            "enable_format_assistance": true
+          }
+        ]
+      }
+    ]
+  },
+  "instructions": {
+    "example_question_sqls": [
+      {
+        "id": "b0000000000000000000000000000001",
+        "question": ["How many current ICU patients are ready for step-down?"],
+        "sql": ["SELECT SUM(CASE WHEN r.readiness_label = 1 THEN 1 ELSE 0 END) AS ready_for_step_down, SUM(CASE WHEN r.readiness_label = 0 THEN 1 ELSE 0 END) AS not_ready, COUNT(*) AS total_current_patients FROM icu_step_down.gold.census c INNER JOIN icu_step_down.gold.readiness_training_set r ON c.icustay_id = r.icustay_id"]
+      },
+      {
+        "id": "b0000000000000000000000000000002",
+        "question": ["What is the average ICU length of stay by readiness band?"],
+        "sql": ["SELECT r.readiness_label, CASE WHEN r.readiness_label = 1 THEN 'Ready (safe step-down)' ELSE 'Not ready (bounce-back risk)' END AS readiness_band, ROUND(AVG(CAST(r.los AS DOUBLE)), 2) AS avg_los_days, COUNT(*) AS num_stays FROM icu_step_down.gold.readiness_training_set r WHERE r.los IS NOT NULL GROUP BY r.readiness_label ORDER BY r.readiness_label"]
+      },
+      {
+        "id": "b0000000000000000000000000000003",
+        "question": ["How many current patients are on vasopressors and on a ventilator at the same time?"],
+        "sql": ["SELECT SUM(CASE WHEN c.on_vasopressors AND c.on_ventilator THEN 1 ELSE 0 END) AS on_both, SUM(CASE WHEN c.on_vasopressors THEN 1 ELSE 0 END) AS on_vasopressors_only, SUM(CASE WHEN c.on_ventilator THEN 1 ELSE 0 END) AS on_ventilator_only, COUNT(*) AS total_patients FROM icu_step_down.gold.census c"]
+      },
+      {
+        "id": "b0000000000000000000000000000004",
+        "question": ["What is the average heart rate and GCS for patients over 65?"],
+        "sql": ["SELECT ROUND(AVG(r.hr_mean), 1) AS avg_heart_rate_bpm, ROUND(AVG(CAST(r.gcs_last AS DOUBLE)), 1) AS avg_gcs_score, COUNT(*) AS num_stays FROM icu_step_down.gold.readiness_training_set r WHERE r.age > 65 AND r.hr_mean IS NOT NULL AND r.gcs_last IS NOT NULL"]
+      },
+      {
+        "id": "b0000000000000000000000000000005",
+        "question": ["What fraction of ICU stays had a bounce-back within 72 hours?"],
+        "sql": ["SELECT ROUND(SUM(CASE WHEN r.readiness_label = 0 THEN 1 ELSE 0 END) * 100.0 / COUNT(*), 2) AS bounce_back_pct, SUM(CASE WHEN r.readiness_label = 0 THEN 1 ELSE 0 END) AS bounce_back_count, COUNT(*) AS total_stays FROM icu_step_down.gold.readiness_training_set r"]
+      }
+    ],
+    "text_instructions": [
+      {
+        "id": "c0000000000000000000000000000001",
+        "content": [
+          "## PURPOSE\n- Answer clinical and analytical questions about ICU step-down readiness, patient vitals, length of stay, and bounce-back outcomes.\n- Users are ICU clinicians and data analysts.\n\n## DISAMBIGUATION\n- 'Current patients' or 'census' = the 40 active ICU patients in the census table.\n- 'Ready for step-down' or 'readiness band 1' = readiness_label = 1 in readiness_training_set.\n- 'Bounce-back' = patient returned to ICU within 72 hours; these have readiness_label = 0.\n- 'Readiness band' means GROUP BY readiness_label (1 = ready, 0 = not ready).\n- GCS (gcs_last) is the Glasgow Coma Scale TOTAL score, range 3-15; higher is better; 15 = fully alert.\n- los is in DAYS stored as string; use CAST(los AS DOUBLE) for arithmetic.\n- Readiness label is an outcome (0 or 1), not a probability score.\n\n## DATA QUALITY NOTES\n- census: 37 of 40 patients have NULL vital aggregates; use on_vasopressors and on_ventilator booleans for census filters; join to readiness_training_set on icustay_id to get vitals or readiness for current patients.\n- readiness_training_set: hr_mean NULL in 41% of stays, gcs_last NULL in 53%; filter IS NOT NULL when computing averages.\n- silver.vital_signs is 21.7M rows; always filter by icustay_id or charttime.\n\n## CONSTRAINTS\n- Return aggregates only (COUNT, AVG, SUM, ROUND); do not return individual patient rows.\n- Do not use SELECT *."
+        ]
+      }
+    ]
+  }
+}
