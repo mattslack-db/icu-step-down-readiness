@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>ICU Step-Down Readiness — Business Deck</title>
+<style>
+  :root{--ink:#0b1324;--muted:#5b6b86;--bg:#f6f8fc;--card:#fff;--accent:#ff3621;--green:#12805c;--amber:#b45309;--line:#e2e8f2}
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:var(--ink);background:var(--bg)}
+  #deck{height:100%}
+  .slide{display:none;min-height:100vh;padding:6vh 8vw;flex-direction:column;justify-content:center}
+  .slide.active{display:flex}
+  h1{font-size:clamp(28px,5vw,52px);line-height:1.05;margin:0 0 .3em}
+  h2{font-size:clamp(22px,3.4vw,34px);margin:0 0 .6em}
+  p,li{font-size:clamp(15px,1.7vw,20px);line-height:1.5;color:var(--ink)}
+  .muted{color:var(--muted)}
+  .kicker{text-transform:uppercase;letter-spacing:.14em;font-size:13px;font-weight:700;color:var(--accent);margin-bottom:1em}
+  .grid{display:grid;gap:18px;margin-top:12px}
+  .g2{grid-template-columns:1fr 1fr}.g3{grid-template-columns:repeat(3,1fr)}.g4{grid-template-columns:repeat(4,1fr)}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px 22px}
+  .stat{font-size:clamp(26px,4vw,40px);font-weight:800;line-height:1}
+  .stat.green{color:var(--green)} .stat.accent{color:var(--accent)}
+  .label{color:var(--muted);font-size:14px;margin-top:8px}
+  ul{margin:.3em 0;padding-left:1.1em} li{margin:.35em 0}
+  .flow{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:14px}
+  .step{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 14px;font-weight:600;font-size:15px}
+  .arrow{color:var(--muted);font-size:20px}
+  .two{display:grid;grid-template-columns:1fr 1fr;gap:28px}
+  .tag{display:inline-block;background:#eef2f9;border-radius:999px;padding:4px 12px;font-size:13px;font-weight:600;color:var(--muted);margin:3px 4px 0 0}
+  footer{position:fixed;bottom:14px;left:0;right:0;display:flex;justify-content:space-between;padding:0 22px;font-size:12px;color:var(--muted)}
+  .nav{cursor:pointer;user-select:none}
+  code{background:#eef2f9;padding:1px 6px;border-radius:6px;font-size:.9em}
+  @media(prefers-color-scheme:dark){:root{--ink:#e8eefc;--muted:#9fb0cc;--bg:#0b1220;--card:#131c2e;--line:#243149}}
+</style>
+</head>
+<body>
+<div id="deck">
+
+  <section class="slide active">
+    <div class="kicker">Databricks · Healthcare / ICU Operations</div>
+    <h1>ICU Step-Down Readiness</h1>
+    <p class="muted" style="max-width:60ch">Turning scarce ICU capacity into a decision advantage — an AI-assisted way to see, every shift, which patients are most ready to safely leave intensive care.</p>
+    <p style="margin-top:22px"><span class="tag">Lakeflow</span><span class="tag">Unity Catalog</span><span class="tag">Lakebase</span><span class="tag">Mosaic AI + Foundation Models</span><span class="tag">Genie</span><span class="tag">Databricks Apps</span></p>
+  </section>
+
+  <section class="slide">
+    <div class="kicker">The problem</div>
+    <h2>A blocked ICU bed is a clinical and financial bottleneck</h2>
+    <div class="grid g3">
+      <div class="card"><div class="stat">70–90%</div><div class="label">Typical ICU occupancy — one blocked bed delays a critical admission</div></div>
+      <div class="card"><div class="stat">Manual</div><div class="label">Step-down decisions are subjective and vary by provider and shift</div></div>
+      <div class="card"><div class="stat">"To be safe"</div><div class="label">Clinicians hold patients longer than needed, lengthening stays</div></div>
+    </div>
+    <p class="muted" style="margin-top:18px">The question every intensivist asks on rounds — <em>“who can safely move to step-down today?”</em> — has no consistent, data-driven answer.</p>
+  </section>
+
+  <section class="slide">
+    <div class="kicker">The outcome we sell</div>
+    <h2>Free ICU capacity without compromising safety</h2>
+    <div class="grid g4">
+      <div class="card"><div class="stat green">10–15%</div><div class="label">Target reduction in ICU length of stay</div></div>
+      <div class="card"><div class="stat green">$2–5k</div><div class="label">Saved per accelerated discharge-day</div></div>
+      <div class="card"><div class="stat green">+beds</div><div class="label">More ICU capacity for emergent admissions</div></div>
+      <div class="card"><div class="stat green">Consistency</div><div class="label">Evidence-informed decisions across shifts</div></div>
+    </div>
+    <p class="muted" style="margin-top:18px">For a 30-bed ICU, a 0.8-day average LOS reduction is on the order of <strong>hundreds of additional patient-days of capacity per year</strong>.</p>
+  </section>
+
+  <section class="slide">
+    <div class="kicker">What we built</div>
+    <h2>One governed journey — raw data to a clinician's screen</h2>
+    <div class="flow">
+      <span class="step">MIMIC-III (Delta Share)</span><span class="arrow">→</span>
+      <span class="step">Lakeflow medallion</span><span class="arrow">→</span>
+      <span class="step">Unity Catalog</span><span class="arrow">→</span>
+      <span class="step">Lakebase serving</span><span class="arrow">→</span>
+      <span class="step">ML + Gen AI</span><span class="arrow">→</span>
+      <span class="step">Genie</span><span class="arrow">→</span>
+      <span class="step">Databricks App</span>
+    </div>
+    <p class="muted" style="margin-top:20px">Integrated, not siloed: the same governed gold tables feed the operational app, the model, and natural-language querying — one lineage, one source of truth.</p>
+  </section>
+
+  <section class="slide">
+    <div class="kicker">The product</div>
+    <h2>A ranked ICU census the care team acts on</h2>
+    <div class="two">
+      <div>
+        <ul>
+          <li><strong>Census dashboard</strong> — every current patient ranked by a relative readiness index, color-banded Ready / Borderline / Not-ready.</li>
+          <li><strong>Patient detail</strong> — the factors driving each recommendation, vital-sign trends, and a plain-language <strong>AI clinical summary</strong>.</li>
+          <li><strong>Analytics</strong> — capacity and outcome trends, with honest model performance.</li>
+        </ul>
+        <p class="muted">Live: <code>icu-step-down-…databricksapps.com</code></p>
+      </div>
+      <div class="card">
+        <div class="label" style="margin:0 0 10px">Example — ranked census</div>
+        <p style="margin:.2em 0">🟢 <strong>92</strong> · Ready · off pressors 36h, GCS 15</p>
+        <p style="margin:.2em 0">🟢 <strong>78</strong> · Ready · extubated, stable VS</p>
+        <p style="margin:.2em 0">🟡 <strong>54</strong> · Borderline · lactate ↑</p>
+        <p style="margin:.2em 0">🔴 <strong>18</strong> · Not ready · on vent + pressors</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="slide">
+    <div class="kicker">For the technical / clinical owner</div>
+    <h2>Built to be trusted, governed, and operated</h2>
+    <div class="grid g2">
+      <div class="card"><strong>Governed by design</strong><p class="muted">Unity Catalog across the medallion — PII classification tags on identifiers, least-privilege grants, and full bronze→gold lineage.</p></div>
+      <div class="card"><strong>Operationally served</strong><p class="muted">Gold features synced to Lakebase (Postgres) for low-latency app reads; model served on Mosaic AI; narrative via the Foundation Model API.</p></div>
+      <div class="card"><strong>Reproducible</strong><p class="muted">Everything deploys via Databricks Asset Bundles; 117 backend + 32 frontend + 17 pipeline-integration tests.</p></div>
+      <div class="card"><strong>Safe by framing</strong><p class="muted">De-identified public data; a relative decision-support index, not an automated discharge gate.</p></div>
+    </div>
+  </section>
+
+  <section class="slide">
+    <div class="kicker">Model honesty</div>
+    <h2>Decision support, not a discharge switch</h2>
+    <div class="grid g3">
+      <div class="card"><div class="stat">AUC 0.66</div><div class="label">Honest, modest discrimination on the retrospective feature set</div></div>
+      <div class="card"><div class="stat amber">Index, not %</div><div class="label">Relative readiness rank within the current census — never a "probability of safe discharge"</div></div>
+      <div class="card"><div class="stat">Explainable</div><div class="label">SHAP factors in clinical language; known risks always shown as risks</div></div>
+    </div>
+    <p class="muted" style="margin-top:18px">The roadmap to stronger discrimination: richer real-time features, calibration, and prospective validation with the clinical team.</p>
+  </section>
+
+  <section class="slide">
+    <div class="kicker">The ask</div>
+    <h2>From prototype to a unit pilot</h2>
+    <ul>
+      <li><strong>Sponsor:</strong> a 60–90 day pilot in one ICU, measured on LOS and safe-transfer rate.</li>
+      <li><strong>Clinical owner:</strong> co-define the readiness features and validate against your step-down criteria.</li>
+      <li><strong>Platform:</strong> point the same pipeline at your EHR feed — the architecture is unchanged.</li>
+    </ul>
+    <p class="muted" style="margin-top:20px">The capability is live today on Databricks. The next step is your data and your clinicians.</p>
+  </section>
+
+</div>
+
+<footer>
+  <span class="nav" onclick="go(-1)">‹ prev</span>
+  <span>ICU Step-Down Readiness · FE Tech Bar</span>
+  <span class="nav" onclick="go(1)">next ›</span>
+</footer>
+
+<script>
+  const slides=[...document.querySelectorAll('.slide')];let i=0;
+  function show(n){slides[i].classList.remove('active');i=(n+slides.length)%slides.length;slides[i].classList.add('active');}
+  function go(d){show(i+d);}
+  document.addEventListener('keydown',e=>{if(e.key==='ArrowRight'||e.key===' ')go(1);if(e.key==='ArrowLeft')go(-1);});
+</script>
+</body>
+</html>
