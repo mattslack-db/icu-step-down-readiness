@@ -154,7 +154,8 @@ The space includes one text instructions block with the following sections:
 - Users are ICU clinicians and data analysts.
 
 ### DISAMBIGUATION
-- "Current patients" or "census" = the 40 active ICU patients in the census table.
+- "Current patients", "patients", or any question about patient vitals/demographics without a historical qualifier = scope to the **census** table (40 active ICU patients); join to `readiness_training_set` on `icustay_id` only if outcome or readiness data is needed.
+- Use `readiness_training_set` directly ONLY when the user explicitly asks about historical stays, all ICU stays, bounce-back rates, or aggregate statistics across the full dataset.
 - "Ready for step-down" or "readiness band 1" = readiness_label = 1 in readiness_training_set.
 - "Bounce-back" = patient returned to ICU within 72 hours; these have readiness_label = 0.
 - "Readiness band" means GROUP BY readiness_label (1 = ready, 0 = not ready).
