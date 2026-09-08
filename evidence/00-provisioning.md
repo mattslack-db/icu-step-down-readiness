@@ -23,4 +23,7 @@
 - Profile name: `icu-sandbox` (OAuth U2M) — configured via `databricks auth login`.
 
 ## GitHub repo
-- _pending (Task 0.2)_
+- **URL:** https://github.com/mattslack-db/icu-step-down-readiness
+- **Visibility:** PUBLIC (validator-readable)
+- **Default branch:** main
+- Created under the `mattslack-db` GitHub account; `origin` remote wired; initial history pushed.
