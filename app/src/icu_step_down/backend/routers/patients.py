@@ -7,17 +7,17 @@ Combines:
   - Score + full factor list from the ``icu-readiness`` serving endpoint
   - Gen AI clinical narrative from LLaMA-3.3-70B
   - Relative readiness index computed from the live census distribution
+
+Correctness guarantee: census FEATURE rows and serving predictions are keyed
+by ``icustay_id`` (not matched by position) — Postgres does not guarantee
+consistent row order across separate unordered queries.
 """
 
 from __future__ import annotations
 
-import json
 import logging
-from datetime import datetime, timezone
-from decimal import Decimal
 from typing import Any
 
-from databricks.sdk import WorkspaceClient
 from fastapi import APIRouter, HTTPException
 from sqlmodel import text
 
@@ -28,10 +28,8 @@ from ..lib.readiness import compute_readiness_index, readiness_band_from_index
 from ..models import FactorOut, PatientDetail, PatientFeatures, VitalPoint
 from .census import (
     FEATURE_COLS,
-    _SERVING_ENDPOINT,
     _build_record,
     _call_serving,
-    _parse_prediction,
     _to_bool,
     _to_float,
 )
@@ -44,18 +42,25 @@ router = APIRouter(prefix="/api", tags=["patients"])
 # SQL statements
 # ---------------------------------------------------------------------------
 
-_CENSUS_COLS = ", ".join(
-    f'"{c}"' for c in [
-        "icustay_id", "subject_id", "los", "age",
-        "on_vasopressors", "on_ventilator",
-        "hr_mean", "sbp_mean", "dbp_mean", "spo2_mean", "spo2_min",
-        "temp_c_mean", "rr_mean", "gcs_last", "lactate_last",
-    ] + FEATURE_COLS
-)
+# Patient detail columns (may overlap with FEATURE_COLS — deduplication via set
+# is intentional; Python dicts preserve insertion order so the merge is safe).
+_DETAIL_EXTRA_COLS = [
+    "icustay_id", "subject_id", "los", "age",
+    "on_vasopressors", "on_ventilator",
+    "hr_mean", "sbp_mean", "dbp_mean", "spo2_mean", "spo2_min",
+    "temp_c_mean", "rr_mean", "gcs_last", "lactate_last",
+]
+# Merge extra cols + all FEATURE_COLS, preserving order, no duplicates.
+_seen: set[str] = set()
+_PATIENT_COLS: list[str] = []
+for _col in _DETAIL_EXTRA_COLS + FEATURE_COLS:
+    if _col not in _seen:
+        _PATIENT_COLS.append(_col)
+        _seen.add(_col)
 
 _PATIENT_CENSUS_SQL = text(
-    f"SELECT {_CENSUS_COLS} FROM mimic_iii.census"
-    " WHERE \"icustay_id\" = :icustay_id"
+    "SELECT " + ", ".join(f'"{c}"' for c in _PATIENT_COLS)
+    + " FROM mimic_iii.census WHERE \"icustay_id\" = :icustay_id"
 )
 
 _VITALS_SQL = text(
@@ -66,9 +71,10 @@ _VITALS_SQL = text(
     " LIMIT 500"
 )
 
-# All census icustay_ids (for computing the relative index)
-_ALL_SCORES_SQL = text(
-    'SELECT "icustay_id" FROM mimic_iii.census'
+# Batch census query: include icustay_id so predictions can be keyed by id.
+_CENSUS_BATCH_SQL = text(
+    'SELECT "icustay_id", ' + ", ".join(f'"{c}"' for c in FEATURE_COLS)
+    + " FROM mimic_iii.census"
 )
 
 # ---------------------------------------------------------------------------
@@ -83,13 +89,8 @@ _LACTATE_NOTE = (
 )
 
 
-def _build_narrative_factors(
-    factors: list[dict[str, Any]],
-) -> list[Factor]:
-    """
-    Convert raw endpoint factors to genai.narrative.Factor objects with
-    human-readable labels and corrected clinical direction.
-    """
+def _build_narrative_factors(factors: list[dict[str, Any]]) -> list[Factor]:
+    """Convert raw endpoint factors to narrative.Factor objects with corrected direction."""
     result = []
     for f in factors:
         label, direction, magnitude = normalize_factor(
@@ -121,21 +122,20 @@ def get_patient(
     Return full clinical detail for one ICU patient.
 
     Steps:
-    1. Look up the patient in `mimic_iii.census` (404 if not in active census).
-    2. Fetch vital signs from `mimic_iii.census_vitals`.
-    3. Fetch all census icustay_ids to compute the relative index.
-    4. Call `icu-readiness` serving endpoint.
-    5. Compute relative readiness index and band.
+    1. Look up the patient in ``mimic_iii.census`` (404 if not in active census).
+    2. Fetch vital signs from ``mimic_iii.census_vitals``.
+    3. Batch-fetch all census feature rows (WITH icustay_id); call the serving
+       endpoint for the whole census in one shot.
+    4. Key predictions by icustay_id — never by row position.
+    5. Compute relative readiness index from the full census score distribution.
     6. Generate Gen AI clinical narrative (LLaMA-3.3-70B).
     7. Return assembled PatientDetail.
 
-    All external call failures surface as explicit HTTP errors.
+    All DB and serving errors surface as explicit HTTP errors; none are swallowed.
     """
     # --- 1. Fetch patient census row ---
     try:
-        result = session.execute(
-            _PATIENT_CENSUS_SQL, {"icustay_id": icustay_id}
-        )
+        result = session.execute(_PATIENT_CENSUS_SQL, {"icustay_id": icustay_id})
         keys = list(result.keys())
         row_tuple = result.fetchone()
     except Exception as exc:
@@ -157,9 +157,7 @@ def get_patient(
 
     # --- 2. Fetch vitals ---
     try:
-        vitals_result = session.execute(
-            _VITALS_SQL, {"icustay_id": icustay_id}
-        )
+        vitals_result = session.execute(_VITALS_SQL, {"icustay_id": icustay_id})
         vitals_rows = vitals_result.fetchall()
     except Exception as exc:
         logger.error("Lakebase vitals query failed for %s: %s", icustay_id, exc)
@@ -178,81 +176,48 @@ def get_patient(
                 value=float(value) if value is not None else 0.0,
             ))
         except Exception:
-            continue  # skip malformed rows; don't swallow entire response
+            continue  # skip individual malformed rows only
 
-    # --- 3. Fetch all census scores to build distribution for percentile ---
+    # --- 3. Fetch all census feature rows (icustay_id included) ---
     try:
-        all_ids_result = session.execute(_ALL_SCORES_SQL)
-        all_census_ids = [str(r[0]) for r in all_ids_result.fetchall()]
+        batch_result = session.execute(_CENSUS_BATCH_SQL)
+        batch_keys = list(batch_result.keys())
+        batch_rows = [dict(zip(batch_keys, r)) for r in batch_result.fetchall()]
     except Exception as exc:
-        logger.error("Failed to fetch census distribution: %s", exc)
+        logger.error("Census batch feature fetch failed: %s", exc)
         raise HTTPException(
             status_code=503,
-            detail=f"Failed to fetch census distribution: {exc}",
+            detail=f"Failed to fetch census features for index computation: {exc}",
         ) from exc
 
-    # --- 4. Batch-call serving: this patient + (lazily) full census ---
-    # We only have one patient's features here; to compute the relative index
-    # we need the census distribution.  We call the endpoint for this patient
-    # only and re-use the scores from a quick census pass.
-    # For robustness: if the census endpoint has already been called recently,
-    # the scale endpoint result here is still just one patient.
-    # (The full census pass happens in /api/census; here we compute the index
-    #  against a simple re-query of census scores from the DB.)
-    #
-    # To get census raw scores without a full serving call, we make a single
-    # batch request for all census patients (40 rows, fast).
-    try:
-        all_census_result = session.execute(
-            text(
-                "SELECT " + ", ".join(f'"{c}"' for c in FEATURE_COLS)
-                + " FROM mimic_iii.census"
-            )
-        )
-        all_census_keys = list(all_census_result.keys())
-        all_census_rows = [
-            dict(zip(all_census_keys, r)) for r in all_census_result.fetchall()
-        ]
-    except Exception as exc:
-        logger.error("Census feature fetch for index calc failed: %s", exc)
-        raise HTTPException(
-            status_code=503,
-            detail=f"Failed to fetch census features: {exc}",
-        ) from exc
+    # Preserve the query order so predictions[i] lines up with batch_rows[i].
+    ordered_ids = [str(r["icustay_id"]) for r in batch_rows]
+    records = [_build_record(r) for r in batch_rows]
 
-    all_records = [_build_record(r) for r in all_census_rows]
-    all_predictions = _call_serving(ws, all_records)
-    all_scores = [
-        float(p.get("readiness_score", 0.0)) for p in all_predictions
-    ]
+    # --- 4. Batch-call serving endpoint; key predictions by icustay_id ---
+    all_predictions = _call_serving(ws, records)
 
-    # This patient's prediction — match by position in the census query result
-    # Find the index of this patient in the census
-    patient_census_ids = []
-    try:
-        id_result = session.execute(
-            text('SELECT "icustay_id" FROM mimic_iii.census')
-        )
-        patient_census_ids = [str(r[0]) for r in id_result.fetchall()]
-    except Exception:
-        pass
+    predictions_by_id: dict[str, dict[str, Any]] = {
+        census_id: pred
+        for census_id, pred in zip(ordered_ids, all_predictions)
+    }
 
-    patient_score: float
-    patient_pred: dict[str, Any]
-    if icustay_id in patient_census_ids:
-        idx_in_census = patient_census_ids.index(icustay_id)
-        if idx_in_census < len(all_predictions):
-            patient_pred = all_predictions[idx_in_census]
-            patient_score = float(patient_pred.get("readiness_score", 0.0))
-        else:
-            # fallback: call single
-            single_pred_list = _call_serving(ws, [_build_record(row)])
-            patient_pred = single_pred_list[0]
-            patient_score = float(patient_pred.get("readiness_score", 0.0))
+    all_scores = [float(p.get("readiness_score", 0.0)) for p in all_predictions]
+
+    # Look up this patient's prediction BY KEY — never by position.
+    if icustay_id in predictions_by_id:
+        patient_pred = predictions_by_id[icustay_id]
+        patient_score = float(patient_pred.get("readiness_score", 0.0))
     else:
-        # Patient not in census snapshot but in DB — call individually
-        single_pred_list = _call_serving(ws, [_build_record(row)])
-        patient_pred = single_pred_list[0]
+        # Patient was in census (step 1 succeeded) but absent from batch result —
+        # should not happen in normal operation; score individually and add to
+        # the distribution so the index is still meaningful.
+        logger.warning(
+            "Patient %s not found in batch census result; scoring individually.",
+            icustay_id,
+        )
+        single_preds = _call_serving(ws, [_build_record(row)])
+        patient_pred = single_preds[0]
         patient_score = float(patient_pred.get("readiness_score", 0.0))
         all_scores.append(patient_score)
 
@@ -260,23 +225,34 @@ def get_patient(
     readiness_index = compute_readiness_index(patient_score, all_scores)
     band = readiness_band_from_index(readiness_index)
 
-    # --- 6. Build response factors ---
-    raw_factors = patient_pred.get("factors", [])
-    response_factors: list[FactorOut] = []
-    for f in raw_factors:
-        label, direction, magnitude = normalize_factor(
-            f.get("name", ""),
-            f.get("direction", "risk"),
-            float(f.get("magnitude", 0.0)),
+    # --- 6. Build response factors (sorted by magnitude desc, direction-corrected) ---
+    raw_factors: list[dict[str, Any]] = sorted(
+        patient_pred.get("factors", []),
+        key=lambda f: float(f.get("magnitude", 0.0)),
+        reverse=True,
+    )
+    response_factors: list[FactorOut] = [
+        FactorOut(
+            name=label,
+            direction=direction,
+            magnitude=magnitude,
         )
-        response_factors.append(FactorOut(name=label, direction=direction, magnitude=magnitude))
+        for label, direction, magnitude in (
+            normalize_factor(
+                f.get("name", ""),
+                f.get("direction", "risk"),
+                float(f.get("magnitude", 0.0)),
+            )
+            for f in raw_factors
+        )
+    ]
 
     # --- 7. Generate Gen AI narrative ---
     narrative_factors = _build_narrative_factors(raw_factors)
     try:
-        # Pass the INDEX-derived representative score so the narrative band
-        # matches the displayed band (not the raw score, which clusters ~0.44–0.53).
-        # We encode the band as a score hint: Ready≈0.90, Borderline≈0.60, Not ready≈0.20.
+        # Pass an index-derived representative score so the narrative band label
+        # matches the displayed band (raw score clusters ~0.44–0.53 and is not
+        # a probability; the narrative must say "Ready"/"Borderline"/"Not ready").
         _band_score_hint = {
             "Ready": 0.90,
             "Borderline": 0.60,
@@ -285,18 +261,15 @@ def get_patient(
         narrative = build_narrative(_band_score_hint, narrative_factors)
     except Exception as exc:
         logger.warning("Gen AI narrative generation failed: %s", exc)
-        narrative = (
-            f"Clinical narrative unavailable ({exc}). "
-            f"Readiness band: {band}."
-        )
+        narrative = f"Clinical narrative unavailable ({exc}). Readiness band: {band}."
 
-    # Lactate note
-    factor_names = [f.get("name", "") for f in raw_factors]
+    # Lactate note (present when lactate_last is a top model factor)
+    raw_factor_names = [f.get("name", "") for f in raw_factors]
     lactate_note: str | None = (
-        _LACTATE_NOTE if "lactate_last" in factor_names else None
+        _LACTATE_NOTE if "lactate_last" in raw_factor_names else None
     )
 
-    # --- 8. Assemble PatientFeatures ---
+    # --- 8. Assemble and return ---
     features = PatientFeatures(
         icustay_id=str(row["icustay_id"]),
         subject_id=str(row["subject_id"]),

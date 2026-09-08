@@ -60,9 +60,10 @@ _GLOBAL_FEATURE_IMPORTANCE: list[tuple[str, float]] = [
     ("sbp_mean", 0.01293),
 ]
 
-# Analytics SQL
+# Analytics SQL: icustay_id + all FEATURE_COLS (which already include los,
+# on_vasopressors, on_ventilator — no duplication).
 _ANALYTICS_SQL = text(
-    'SELECT "icustay_id", "los", "on_vasopressors", "on_ventilator", '
+    'SELECT "icustay_id", '
     + ", ".join(f'"{c}"' for c in FEATURE_COLS)
     + " FROM mimic_iii.census"
 )

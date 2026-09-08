@@ -215,8 +215,13 @@ def get_census(
         raw_score = float(pred.get("readiness_score", 0.0))
         band = readiness_band_from_index(idx)
 
-        # Top-3 factors, direction-corrected
-        raw_factors = pred.get("factors", [])
+        # Top-3 factors by magnitude (explicit sort — model returns top-5 by
+        # magnitude already, but sort here makes the guarantee explicit).
+        raw_factors = sorted(
+            pred.get("factors", []),
+            key=lambda f: float(f.get("magnitude", 0.0)),
+            reverse=True,
+        )
         top_factors: list[FactorOut] = []
         for f in raw_factors[:3]:
             label, direction, magnitude = normalize_factor(
