@@ -1,0 +1,9 @@
+$ databricks bundle validate -t sandbox --profile icu-sandbox
+Name: icu_step_down
+Target: sandbox
+Workspace:
+  Host: https://fe-sandbox-icu-step-down-readiness.cloud.databricks.com
+  User: matt.slack@databricks.com
+  Path: /Workspace/Users/matt.slack@databricks.com/.bundle/icu_step_down/sandbox
+
+Validation OK!

@@ -1,0 +1,18 @@
+bundle:
+  name: icu_step_down
+
+include:
+  - resources/*.yml
+
+variables:
+  catalog:
+    description: Unity Catalog catalog name for all schemas (bronze, silver, gold, ml).
+    default: icu_step_down
+  lakebase_instance:
+    description: Lakebase Postgres instance name for operational serving.
+    default: icu-step-down
+
+targets:
+  sandbox:
+    workspace:
+      host: https://fe-sandbox-icu-step-down-readiness.cloud.databricks.com
