@@ -539,6 +539,9 @@ function PatientDetailSkeleton() {
   );
 }
 
+// ─── Exports for testing ───────────────────────────────────────────────────
+export { PatientDetailContent, PatientDetailSkeleton, ReadinessGauge };
+
 // ─── Route ─────────────────────────────────────────────────────────────────
 export const Route = createFileRoute("/patients/$icustay_id")({
   component: function PatientDetailPage() {

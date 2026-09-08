@@ -301,6 +301,9 @@ function AnalyticsSkeleton() {
   );
 }
 
+// ─── Exports for testing ───────────────────────────────────────────────────
+export { AnalyticsContent };
+
 // ─── Route ─────────────────────────────────────────────────────────────────
 export const Route = createFileRoute("/analytics")({
   component: () => (

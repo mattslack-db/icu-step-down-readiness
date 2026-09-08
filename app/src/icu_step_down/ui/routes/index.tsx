@@ -322,6 +322,9 @@ function CensusSkeleton() {
   );
 }
 
+// ─── Exports for testing ───────────────────────────────────────────────────
+export { CensusDashboard };
+
 // ─── Route ─────────────────────────────────────────────────────────────────
 export const Route = createFileRoute("/")({
   component: () => (

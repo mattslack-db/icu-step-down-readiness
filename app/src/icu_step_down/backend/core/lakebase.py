@@ -161,12 +161,12 @@ def _build_engine_url(
                 f"@localhost:{dev_port}/{db_config.database_name}?sslmode=disable"
             )
         else:
-            # APX_DEV_DB_PORT set but no password — this project uses Lakebase
-            # (postgres resource), not the embedded PGLite database. Fall
-            # through to the Lakebase path so the backend starts correctly.
-            logger.info(
-                "APX_DEV_DB_PORT set but APX_DEV_DB_PWD absent; "
-                "falling through to Lakebase mode."
+            raise ValueError(
+                "APX_DEV_DB_PORT is set but APX_DEV_DB_PWD is absent. "
+                "This project connects directly to Lakebase and does not use "
+                "the embedded PGLite database. Either set APX_DEV_DB_PWD for "
+                "local PGLite dev, or unset APX_DEV_DB_PORT to connect to "
+                "the Lakebase endpoint directly."
             )
 
     # Production / local-against-sandbox mode

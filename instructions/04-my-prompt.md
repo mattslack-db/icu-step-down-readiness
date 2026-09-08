@@ -26,6 +26,7 @@ Read all three reference files in this folder before starting:
 - **GitHub:** Store the repo under the `mattslack-db` account so it can be marked.
 - **Workspace:** Use the **fevm** MCP to create a dedicated workspace, on an **AWS serverless sandbox**. Use sensible defaults for workspace naming/region preference.
 - **Deployment:** Use **DABs** (Databricks Asset Bundles) to deploy the Databricks assets to the workspace.
+- **Testing:** Add a comprehensive set of backend and frontend tests for the app, and integration tests for the data pipeline.
 
 ---
 

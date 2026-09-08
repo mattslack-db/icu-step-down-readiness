@@ -2,15 +2,19 @@
 Unit tests for the analytics router.
 
 Tests cover the global feature importance list, the analytics SQL
-structure, and the aggregation helpers used in the /api/analytics route.
+structure, and the band-distribution aggregation in the real
+get_analytics route (Lakebase session + serving endpoint mocked).
 """
 
 from __future__ import annotations
 
+import json
+from unittest.mock import MagicMock
+
 import pytest
 
 from icu_step_down.backend.lib.feature_labels import FEATURE_LABELS
-from icu_step_down.backend.routers.analytics import _GLOBAL_FEATURE_IMPORTANCE
+from icu_step_down.backend.routers.analytics import _GLOBAL_FEATURE_IMPORTANCE, get_analytics
 from icu_step_down.backend.routers.census import FEATURE_COLS
 
 
@@ -81,43 +85,86 @@ class TestFeatureColsAlignment:
 
 
 # ---------------------------------------------------------------------------
-# Band distribution helpers (conceptual coverage)
+# Band distribution via the REAL get_analytics route (mocked Lakebase + serving)
 # ---------------------------------------------------------------------------
 
 
-class TestBandDistributionConcept:
-    """Verify that band distribution logic produces sensible outputs."""
+def _make_session(rows: list[dict]) -> MagicMock:
+    """Return a mock SQLModel session that yields the given census rows."""
+    session = MagicMock()
+    result = MagicMock()
+    if rows:
+        result.keys.return_value = list(rows[0].keys())
+        result.fetchall.return_value = [
+            tuple(row[k] for k in rows[0].keys()) for row in rows
+        ]
+    else:
+        result.keys.return_value = []
+        result.fetchall.return_value = []
+    session.execute.return_value = result
+    return session
 
-    def _compute_distribution(
-        self,
-        bands: list[str],
-    ) -> dict[str, dict]:
-        """Minimal reimplementation of what the route does."""
-        from collections import Counter
 
-        n = len(bands)
-        if n == 0:
-            return {}
-        counts = Counter(bands)
-        return {
-            band: {"count": cnt, "pct": round(cnt / n * 100, 1)}
-            for band, cnt in counts.items()
-        }
+def _make_ws(scores: list[float]) -> MagicMock:
+    """Return a mock WorkspaceClient whose serving endpoint returns the given scores."""
+    ws = MagicMock()
+    ws.config.client_id = None
+    ws.serving_endpoints.query.return_value.predictions = [
+        {"prediction": json.dumps({"readiness_score": s, "factors": []})}
+        for s in scores
+    ]
+    return ws
 
-    def test_equal_split_three_bands(self) -> None:
-        bands = ["Ready"] * 13 + ["Borderline"] * 13 + ["Not ready"] * 14
-        dist = self._compute_distribution(bands)
-        assert dist["Ready"]["count"] == 13
-        assert dist["Not ready"]["count"] == 14
-        total_pct = sum(d["pct"] for d in dist.values())
+
+def _census_row(icustay_id: str, los: float = 5.0) -> dict:
+    """Build a minimal census row with all FEATURE_COLS present."""
+    row: dict = {"icustay_id": icustay_id}
+    for col in FEATURE_COLS:
+        if col == "los":
+            row[col] = los
+        elif col in ("on_vasopressors", "on_ventilator"):
+            row[col] = 0
+        else:
+            row[col] = None
+    return row
+
+
+class TestBandDistributionViaRoute:
+    """Verify band distribution aggregation in the real get_analytics route."""
+
+    def test_equal_split_across_three_bands(self) -> None:
+        """Scores spanning low/mid/high produce a roughly equal band split."""
+        rows = [_census_row(f"icu-{i}", los=float(i)) for i in range(6)]
+        # Raw scores will be rank-normalised into indices roughly 0, 20, 40, 60, 80, 100
+        scores = [0.10, 0.20, 0.30, 0.70, 0.80, 0.90]
+
+        resp = get_analytics(_make_session(rows), _make_ws(scores))
+
+        band_map = {b.band: b.count for b in resp.band_distribution}
+        # Ready (index ≥ 66): two highest scores → 2
+        # Borderline (33–65): two middle scores → 2
+        # Not ready (< 33): two lowest scores → 2
+        assert band_map.get("Ready", 0) == 2
+        assert band_map.get("Borderline", 0) == 2
+        assert band_map.get("Not ready", 0) == 2
+        assert sum(b.count for b in resp.band_distribution) == 6
+
+    def test_percentages_sum_to_100(self) -> None:
+        """Band percentages must sum to 100 (within rounding tolerance)."""
+        rows = [_census_row(f"icu-{i}") for i in range(10)]
+        scores = [float(i) / 10.0 for i in range(10)]
+
+        resp = get_analytics(_make_session(rows), _make_ws(scores))
+
+        total_pct = sum(b.pct for b in resp.band_distribution)
         assert total_pct == pytest.approx(100.0, abs=1.0)
 
-    def test_all_ready(self) -> None:
-        bands = ["Ready"] * 5
-        dist = self._compute_distribution(bands)
-        assert dist["Ready"]["pct"] == pytest.approx(100.0)
-        assert "Borderline" not in dist
-        assert "Not ready" not in dist
+    def test_empty_census_returns_empty_distribution(self) -> None:
+        """When there are no census rows, the route returns zero counts."""
+        session = _make_session([])
+        ws = _make_ws([])
 
-    def test_empty_returns_empty(self) -> None:
-        assert self._compute_distribution([]) == {}
+        resp = get_analytics(session, ws)
+
+        assert resp.total_census == 0
+        assert resp.band_distribution == []
