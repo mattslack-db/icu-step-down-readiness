@@ -7,7 +7,7 @@
 --
 -- Purpose:
 --   1. Comments on catalog, schemas, and key tables (idempotent DDL).
---   2. Column-level classification tags on patient identifiers in gold.patient_features.
+--   2. Column-level classification tags on patient identifiers in all three gold tables.
 --   3. Broad read grants to `account users` on the gold schema.
 --
 -- Idempotency: COMMENT ON, SET TAGS, and GRANT are all safe to re-run.
@@ -40,6 +40,15 @@ COMMENT ON SCHEMA icu_step_down.gold IS
 
 -- ---------------------------------------------------------------------------
 -- SECTION 2 — Table comments
+--
+-- WARNING — MATERIALIZED VIEW metadata loss:
+--   The three gold tables (patient_features, readiness_training_set, census)
+--   are MATERIALIZED VIEWs created by the Lakeflow pipeline. If the pipeline
+--   drops and recreates them, ALL COMMENTs and column TAGS on those views are
+--   silently lost — Unity Catalog does not persist them through a DROP/CREATE
+--   cycle. governance.sql MUST be re-run after any pipeline recreate. It is
+--   fully idempotent (COMMENT ON overwrites; SET TAGS overwrites; GRANT is a
+--   no-op if already granted), so re-running is always safe.
 -- ---------------------------------------------------------------------------
 
 -- Gold layer
@@ -66,12 +75,13 @@ COMMENT ON TABLE icu_step_down.silver.vital_signs IS
 --   (even though MIMIC-III is de-identified, the subject/admission/stay IDs are
 --   linking keys that must be treated as sensitive in any downstream context).
 --
--- Columns tagged:
+-- Columns tagged on ALL THREE gold tables (same identifiers exist in each):
 --   subject_id  — MIMIC-III patient identifier (maps to a real de-identified patient)
 --   hadm_id     — Hospital admission identifier (links all events in one admission)
 --   icustay_id  — ICU stay identifier (narrower than hadm_id; maps 1:M within admission)
 -- ---------------------------------------------------------------------------
 
+-- gold.patient_features
 ALTER TABLE icu_step_down.gold.patient_features
   ALTER COLUMN subject_id SET TAGS ('data_classification' = 'pii');
 
@@ -79,6 +89,26 @@ ALTER TABLE icu_step_down.gold.patient_features
   ALTER COLUMN hadm_id SET TAGS ('data_classification' = 'pii');
 
 ALTER TABLE icu_step_down.gold.patient_features
+  ALTER COLUMN icustay_id SET TAGS ('data_classification' = 'pii');
+
+-- gold.readiness_training_set
+ALTER TABLE icu_step_down.gold.readiness_training_set
+  ALTER COLUMN subject_id SET TAGS ('data_classification' = 'pii');
+
+ALTER TABLE icu_step_down.gold.readiness_training_set
+  ALTER COLUMN hadm_id SET TAGS ('data_classification' = 'pii');
+
+ALTER TABLE icu_step_down.gold.readiness_training_set
+  ALTER COLUMN icustay_id SET TAGS ('data_classification' = 'pii');
+
+-- gold.census
+ALTER TABLE icu_step_down.gold.census
+  ALTER COLUMN subject_id SET TAGS ('data_classification' = 'pii');
+
+ALTER TABLE icu_step_down.gold.census
+  ALTER COLUMN hadm_id SET TAGS ('data_classification' = 'pii');
+
+ALTER TABLE icu_step_down.gold.census
   ALTER COLUMN icustay_id SET TAGS ('data_classification' = 'pii');
 
 
@@ -103,4 +133,7 @@ ALTER TABLE icu_step_down.gold.patient_features
 GRANT USE CATALOG ON CATALOG icu_step_down TO `account users`;
 
 -- Gold schema: traversal + read
+-- NOTE (production): In production, readiness_training_set should be restricted
+--   to the ML pipeline service principal only; SELECT ON SCHEMA here is a sandbox/demo
+--   choice that grants all account users access to the full gold layer.
 GRANT USE SCHEMA, SELECT ON SCHEMA icu_step_down.gold TO `account users`;

@@ -113,24 +113,32 @@ databricks experimental aitools tools query \
 
 ## 3. Column Classification Tags
 
-Tags applied to `icu_step_down.gold.patient_features` patient identifier columns.
+Tags applied to **all three gold tables** on patient identifier columns (subject_id, hadm_id, icustay_id).
 
 **Note on tag policy:** The workspace enforces a tag policy on `data_classification` with allowed values `[secret, pii, non-pii]`. The initial SQL used `'identifier'` which was rejected. Tags were applied with value `'pii'` — the semantically correct choice since subject_id/hadm_id/icustay_id are patient linking keys that must be treated as sensitive in any downstream context (even though MIMIC-III is de-identified, these IDs could correlate with external data).
 
+**Review fix (2026-09-08):** Initial run only tagged `gold.patient_features`. Tags extended to `gold.readiness_training_set` and `gold.census` so all three gold tables are consistently classified.
+
 ```
 databricks experimental aitools tools query \
-  "SELECT column_name, tag_name, tag_value
+  "SELECT table_name, column_name, tag_name, tag_value
    FROM icu_step_down.information_schema.column_tags
-   WHERE schema_name = 'gold' AND table_name = 'patient_features'
-   ORDER BY column_name" \
+   WHERE schema_name = 'gold'
+   ORDER BY table_name, column_name" \
   --profile icu-sandbox
 ```
 
-| column_name | tag_name            | tag_value |
-|------------|---------------------|-----------|
-| hadm_id    | data_classification | pii       |
-| icustay_id | data_classification | pii       |
-| subject_id | data_classification | pii       |
+| table_name              | column_name | tag_name            | tag_value |
+|------------------------|------------|---------------------|-----------|
+| census                 | hadm_id    | data_classification | pii       |
+| census                 | icustay_id | data_classification | pii       |
+| census                 | subject_id | data_classification | pii       |
+| patient_features       | hadm_id    | data_classification | pii       |
+| patient_features       | icustay_id | data_classification | pii       |
+| patient_features       | subject_id | data_classification | pii       |
+| readiness_training_set | hadm_id    | data_classification | pii       |
+| readiness_training_set | icustay_id | data_classification | pii       |
+| readiness_training_set | subject_id | data_classification | pii       |
 
 ---
 
