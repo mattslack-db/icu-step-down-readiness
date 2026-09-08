@@ -24,6 +24,14 @@ app-entrypoint = "icu_step_down.backend.app:app"
 api-prefix = "/api"
 metadata-path = "src/icu_step_down/_metadata.py"
 
+[tool.apx.ui]
+root = "src/icu_step_down/ui"
+
+[tool.apx.ui.registries]
+"@animate-ui" = "https://animate-ui.com/r/{name}.json"
+"@ai-elements" = "https://registry.ai-sdk.dev/{name}.json"
+"@svgl" = "https://svgl.app/r/{name}.json"
+
 [build-system]
 requires = ["hatchling", "uv-dynamic-versioning>=0.7.0"]
 build-backend = "hatchling.build"
@@ -43,3 +51,4 @@ version = "{version}"
 
 [tool.hatch.build]
 artifacts = ["src/icu_step_down/__dist__", "src/icu_step_down/_metadata.py"]
+exclude = ["src/icu_step_down/ui"]

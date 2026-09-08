@@ -55,7 +55,15 @@ class DatabaseConfig(BaseSettings):
 
 
 def _get_dev_db_port() -> int | None:
-    """Check for APX_DEV_DB_PORT environment variable for local development."""
+    """Check for APX_DEV_DB_PORT environment variable for local development.
+
+    Returns None when PGENDPOINT is set — this project connects directly to
+    the Lakebase Postgres endpoint and does not use the apx embedded PGLite DB.
+    """
+    if os.environ.get("PGENDPOINT"):
+        # Always use Lakebase when a real endpoint is configured; ignore the
+        # embedded PGLite that apx spins up for simpler scaffold projects.
+        return None
     port = os.environ.get("APX_DEV_DB_PORT")
     return int(port) if port else None
 
@@ -127,16 +135,21 @@ def _build_engine_url(
 ) -> str:
     """Build the SQLAlchemy engine URL."""
     if dev_port:
-        logger.info("Using local dev database at localhost:%d", dev_port)
         password = os.environ.get("APX_DEV_DB_PWD")
-        if password is None:
-            raise ValueError(
-                "APX server didn't provide a password; check dev server logs."
+        if password is not None:
+            logger.info("Using local dev database at localhost:%d", dev_port)
+            return (
+                f"postgresql+psycopg://postgres:{password}"
+                f"@localhost:{dev_port}/{db_config.database_name}?sslmode=disable"
             )
-        return (
-            f"postgresql+psycopg://postgres:{password}"
-            f"@localhost:{dev_port}/{db_config.database_name}?sslmode=disable"
-        )
+        else:
+            # APX_DEV_DB_PORT set but no password — this project uses Lakebase
+            # (postgres resource), not the embedded PGLite database. Fall
+            # through to the Lakebase path so the backend starts correctly.
+            logger.info(
+                "APX_DEV_DB_PORT set but APX_DEV_DB_PWD absent; "
+                "falling through to Lakebase mode."
+            )
 
     # Production / local-against-sandbox mode
     logger.info("Using Lakebase endpoint: %s", db_config.postgres_endpoint)
