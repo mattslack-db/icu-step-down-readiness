@@ -9,7 +9,7 @@
   *{box-sizing:border-box}
   html,body{margin:0;height:100%;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:var(--ink);background:var(--bg)}
   #deck{height:100%}
-  .slide{display:none;min-height:100vh;padding:6vh 8vw;flex-direction:column;justify-content:center}
+  .slide{display:none;min-height:100vh;padding:6vh 8vw 11vh;flex-direction:column;justify-content:center}
   .slide.active{display:flex}
   h1{font-size:clamp(28px,5vw,52px);line-height:1.05;margin:0 0 .3em}
   h2{font-size:clamp(22px,3.4vw,34px);margin:0 0 .6em}
@@ -149,7 +149,11 @@
   const slides=[...document.querySelectorAll('.slide')];let i=0;
   function show(n){slides[i].classList.remove('active');i=(n+slides.length)%slides.length;slides[i].classList.add('active');}
   function go(d){show(i+d);}
-  document.addEventListener('keydown',e=>{if(e.key==='ArrowRight'||e.key===' ')go(1);if(e.key==='ArrowLeft')go(-1);});
+  const FWD=['ArrowRight','ArrowDown','PageDown',' '],BACK=['ArrowLeft','ArrowUp','PageUp'];
+  document.addEventListener('keydown',e=>{
+    if(FWD.includes(e.key)){e.preventDefault();go(1);}
+    else if(BACK.includes(e.key)){e.preventDefault();go(-1);}
+  });
 </script>
 </body>
 </html>
