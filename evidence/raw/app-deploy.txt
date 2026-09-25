@@ -1,0 +1,19 @@
+# Databricks App — deploy & runtime status
+# Captured: 2026-09-25T22:38:55Z | profile: icu-sandbox
+# App: icu-step-down | URL: https://icu-step-down-7474645692590282.aws.databricksapps.com
+
+## App status
+app_state: RUNNING
+compute_state: ACTIVE
+url: https://icu-step-down-7474645692590282.aws.databricksapps.com
+service_principal_client_id: f0c8fee9-2811-47aa-bc75-0f0bff6dd940
+
+## Startup logs (Lakebase connection succeeded — no auth error)
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+2026-09-25T22:35:37Z [APP] ERROR:    Application startup failed. Exiting.
+2026-09-25T22:35:42Z [APP] ERROR:    Child process [84] failed to start, stopping the parent process.
+2026-09-25T22:38:05Z [BUILD] [INFO] Starting app with command: [uvicorn icu_step_down.backend.app:app --workers 2]
+2026-09-25T22:38:06Z [APP] INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+2026-09-25T22:38:07Z [BUILD] [INFO] Deployment successful
+2026-09-25T22:38:08Z [APP] INFO:     Application startup complete.
+2026-09-25T22:38:08Z [APP] INFO:     Application startup complete.

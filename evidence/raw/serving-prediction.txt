@@ -1,0 +1,85 @@
+# Live served prediction — endpoint icu-readiness (Mosaic AI Model Serving)
+# Captured: 2026-09-25T21:51:48Z | model: icu_step_down.ml.readiness_model v2 | profile: icu-sandbox
+# Patient A = stable/off-support (expect higher readiness); Patient B = critical, on pressors+vent (expect lower)
+
+## Request (2 patients, 30 features each)
+{
+    "dataframe_records": [
+        {
+            "hr_mean": 78.0,
+            "hr_min": 64.0,
+            "hr_max": 92.0,
+            "hr_last": 74.0,
+            "sbp_mean": 122.0,
+            "sbp_min": 108.0,
+            "sbp_max": 138.0,
+            "sbp_last": 120.0,
+            "dbp_mean": 70.0,
+            "dbp_min": 60.0,
+            "dbp_max": 82.0,
+            "dbp_last": 72.0,
+            "spo2_mean": 98.0,
+            "spo2_min": 95.0,
+            "spo2_max": 100.0,
+            "spo2_last": 98.0,
+            "temp_c_mean": 37.0,
+            "temp_c_min": 36.6,
+            "temp_c_max": 37.4,
+            "temp_c_last": 37.0,
+            "rr_mean": 16.0,
+            "rr_min": 12.0,
+            "rr_max": 20.0,
+            "rr_last": 15.0,
+            "on_vasopressors": 0,
+            "on_ventilator": 0,
+            "gcs_last": 15,
+            "lactate_last": 1.1,
+            "los": 3.5,
+            "age": 58.0
+        },
+        {
+            "hr_mean": 118.0,
+            "hr_min": 95.0,
+            "hr_max": 140.0,
+            "hr_last": 122.0,
+            "sbp_mean": 92.0,
+            "sbp_min": 74.0,
+            "sbp_max": 110.0,
+            "sbp_last": 88.0,
+            "dbp_mean": 52.0,
+            "dbp_min": 40.0,
+            "dbp_max": 66.0,
+            "dbp_last": 50.0,
+            "spo2_mean": 91.0,
+            "spo2_min": 85.0,
+            "spo2_max": 96.0,
+            "spo2_last": 90.0,
+            "temp_c_mean": 38.4,
+            "temp_c_min": 37.6,
+            "temp_c_max": 39.2,
+            "temp_c_last": 38.6,
+            "rr_mean": 24.0,
+            "rr_min": 18.0,
+            "rr_max": 32.0,
+            "rr_last": 26.0,
+            "on_vasopressors": 1,
+            "on_ventilator": 1,
+            "gcs_last": 8,
+            "lactate_last": 3.8,
+            "los": 1.2,
+            "age": 76.0
+        }
+    ]
+}
+
+## Response
+{
+  "predictions": [
+    {
+      "prediction": "{\"readiness_score\": 0.4738641185006906, \"factors\": [{\"name\": \"lactate_last\", \"direction\": \"risk\", \"magnitude\": 0.26167172896556357}, {\"name\": \"on_ventilator\", \"direction\": \"risk\", \"magnitude\": 0.029906482509719053}, {\"name\": \"rr_last\", \"direction\": \"supports\", \"magnitude\": 0.028640163917219793}, {\"name\": \"rr_mean\", \"direction\": \"supports\", \"magnitude\": 0.026999553212820042}, {\"name\": \"spo2_last\", \"direction\": \"risk\", \"magnitude\": 0.02651961778695385}]}"
+    },
+    {
+      "prediction": "{\"readiness_score\": 0.46317457289329145, \"factors\": [{\"name\": \"lactate_last\", \"direction\": \"risk\", \"magnitude\": 0.1997129056076929}, {\"name\": \"rr_min\", \"direction\": \"risk\", \"magnitude\": 0.10992929139038116}, {\"name\": \"hr_mean\", \"direction\": \"supports\", \"magnitude\": 0.07965128693727104}, {\"name\": \"age\", \"direction\": \"risk\", \"magnitude\": 0.06354697496418336}, {\"name\": \"temp_c_mean\", \"direction\": \"supports\", \"magnitude\": 0.024642436961933453}]}"
+    }
+  ]
+}

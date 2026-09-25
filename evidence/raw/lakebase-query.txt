@@ -1,0 +1,25 @@
+# Lakebase operational serving — synced tables ONLINE
+# Captured: 2026-09-25T22:32:28Z | profile: icu-sandbox | project: icu-step-down | branch: production
+# Lakebase Postgres tables (SNAPSHOT-synced from icu_step_down.gold), read via the
+# UC catalog 'mimic_iii' registered on the Lakebase production branch.
+
+## Synced-table states (from src/lakebase/sync_tables.py --wait)
+  mimic_iii.mimic_iii.census:           SYNCED_TABLE_ONLINE_NO_PENDING_UPDATE
+  mimic_iii.mimic_iii.patient_features: SYNCED_TABLE_ONLINE_NO_PENDING_UPDATE
+  mimic_iii.mimic_iii.census_vitals:    SYNCED_TABLE_ONLINE_NO_PENDING_UPDATE
+
+## Row counts read from Lakebase Postgres (via UC catalog mimic_iii)
+[
+  {
+    "rows": "40",
+    "tbl": "census"
+  },
+  {
+    "rows": "16045",
+    "tbl": "census_vitals"
+  },
+  {
+    "rows": "61532",
+    "tbl": "patient_features"
+  }
+]

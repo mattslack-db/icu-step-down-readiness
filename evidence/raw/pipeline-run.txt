@@ -1,0 +1,138 @@
+# Lakeflow pipeline run — icu-step-down-readiness-medallion
+# Captured: 2026-09-25T22:03:44Z | profile: icu-sandbox | workspace: fe-sandbox-icu-step-down-readiness
+# Pipeline ID: f216d643-ef34-425f-a09a-f1b797b55395 | Update ID: a28ac017-be1b-4555-92f2-d3fa587c5e91
+# Full bronze->silver->gold rebuild after dropping orphaned tables (see evidence/raw/README.md).
+
+## Update summary (COMPLETED)
+{"state":"COMPLETED","cause":"RETRY_ON_FAILURE","pipeline_id":"f216d643-ef34-425f-a09a-f1b797b55395","update_id":"a28ac017-be1b-4555-92f2-d3fa587c5e91"}
+
+## Event log — flow completions (chronological, bronze -> silver -> gold)
+[2026-09-25T22:00:20] dataset_life_cycle: Materialized View `icu_step_down`.`bronze`.`transfers` has been created.
+[2026-09-25T22:00:20] dataset_life_cycle: Materialized View `icu_step_down`.`bronze`.`admissions` has been created.
+[2026-09-25T22:00:20] dataset_life_cycle: Materialized View `icu_step_down`.`bronze`.`prescriptions` has been created.
+[2026-09-25T22:00:20] dataset_life_cycle: Materialized View `icu_step_down`.`bronze`.`patients` has been created.
+[2026-09-25T22:00:20] flow_progress: Flow 'icu_step_down.bronze.transfers' has COMPLETED.
+[2026-09-25T22:00:20] flow_progress: Flow 'icu_step_down.bronze.prescriptions' has COMPLETED.
+[2026-09-25T22:00:20] flow_progress: Flow 'icu_step_down.bronze.admissions' has COMPLETED.
+[2026-09-25T22:00:20] dataset_life_cycle: Materialized View `icu_step_down`.`bronze`.`services` has been created.
+[2026-09-25T22:00:20] flow_progress: Flow 'icu_step_down.bronze.patients' has COMPLETED.
+[2026-09-25T22:00:20] flow_progress: Flow 'icu_step_down.bronze.services' has COMPLETED.
+[2026-09-25T22:00:20] dataset_life_cycle: Materialized View `icu_step_down`.`bronze`.`icu_stays` has been created.
+[2026-09-25T22:00:20] dataset_life_cycle: Materialized View `icu_step_down`.`bronze`.`d_labitems` has been created.
+[2026-09-25T22:00:20] flow_progress: Flow 'icu_step_down.bronze.icu_stays' has COMPLETED.
+[2026-09-25T22:00:20] flow_progress: Flow 'icu_step_down.bronze.d_labitems' has COMPLETED.
+[2026-09-25T22:00:20] dataset_life_cycle: Materialized View `icu_step_down`.`bronze`.`procedure_events_mv` has been created.
+[2026-09-25T22:00:20] flow_progress: Flow 'icu_step_down.bronze.procedure_events_mv' has COMPLETED.
+[2026-09-25T22:00:20] flow_progress: Flow 'icu_step_down.silver.icu_stays' is PLANNING.
+[2026-09-25T22:00:20] flow_progress: Flow 'icu_step_down.silver.patients' is PLANNING.
+[2026-09-25T22:00:21] flow_progress: Flow 'icu_step_down.silver.icu_stays' is STARTING.
+[2026-09-25T22:00:21] flow_progress: Flow 'icu_step_down.silver.icu_stays' is RUNNING.
+[2026-09-25T22:00:21] flow_progress: Flow 'icu_step_down.silver.patients' is STARTING.
+[2026-09-25T22:00:21] flow_progress: Flow 'icu_step_down.silver.patients' is RUNNING.
+[2026-09-25T22:00:25] dataset_life_cycle: Materialized View `icu_step_down`.`silver`.`icu_stays` has been created.
+[2026-09-25T22:00:25] dataset_life_cycle: Materialized View `icu_step_down`.`silver`.`patients` has been created.
+[2026-09-25T22:00:25] flow_progress: Flow 'icu_step_down.silver.icu_stays' has COMPLETED.
+[2026-09-25T22:00:25] flow_progress: Flow 'icu_step_down.silver.patients' has COMPLETED.
+[2026-09-25T22:00:28] dataset_life_cycle: Materialized View `icu_step_down`.`bronze`.`input_events_cv` has been created.
+[2026-09-25T22:00:28] flow_progress: Flow 'icu_step_down.bronze.input_events_cv' has COMPLETED.
+[2026-09-25T22:00:29] dataset_life_cycle: Materialized View `icu_step_down`.`bronze`.`input_events_mv` has been created.
+[2026-09-25T22:00:29] flow_progress: Flow 'icu_step_down.bronze.input_events_mv' has COMPLETED.
+[2026-09-25T22:00:30] dataset_life_cycle: Materialized View `icu_step_down`.`bronze`.`lab_events` has been created.
+[2026-09-25T22:00:30] flow_progress: Flow 'icu_step_down.bronze.lab_events' has COMPLETED.
+[2026-09-25T22:00:30] dataset_life_cycle: Materialized View `icu_step_down`.`bronze`.`chart_events` has been created.
+[2026-09-25T22:00:30] flow_progress: Flow 'icu_step_down.bronze.chart_events' has COMPLETED.
+[2026-09-25T22:00:30] flow_progress: Flow 'icu_step_down.silver.lab_events' is PLANNING.
+[2026-09-25T22:00:30] flow_progress: Flow 'icu_step_down.silver.vital_signs' is PLANNING.
+[2026-09-25T22:00:30] flow_progress: Flow 'icu_step_down.silver.lab_events' is STARTING.
+[2026-09-25T22:00:30] flow_progress: Flow 'icu_step_down.silver.lab_events' is RUNNING.
+[2026-09-25T22:00:30] flow_progress: Flow 'icu_step_down.silver.vital_signs' is STARTING.
+[2026-09-25T22:00:31] flow_progress: Flow 'icu_step_down.silver.vital_signs' is RUNNING.
+[2026-09-25T22:00:42] dataset_life_cycle: Materialized View `icu_step_down`.`silver`.`vital_signs` has been created.
+[2026-09-25T22:00:42] flow_progress: Flow 'icu_step_down.silver.vital_signs' has COMPLETED.
+[2026-09-25T22:00:46] dataset_life_cycle: Materialized View `icu_step_down`.`silver`.`lab_events` has been created.
+[2026-09-25T22:00:46] flow_progress: Flow 'icu_step_down.silver.lab_events' has COMPLETED.
+[2026-09-25T22:00:46] flow_progress: Flow 'icu_step_down.gold.patient_features' is PLANNING.
+[2026-09-25T22:00:48] flow_progress: Flow 'icu_step_down.gold.patient_features' is STARTING.
+[2026-09-25T22:00:48] flow_progress: Flow 'icu_step_down.gold.patient_features' is RUNNING.
+[2026-09-25T22:00:54] dataset_life_cycle: Materialized View `icu_step_down`.`gold`.`patient_features` has been created.
+[2026-09-25T22:00:54] flow_progress: Flow 'icu_step_down.gold.patient_features' has COMPLETED.
+[2026-09-25T22:00:54] flow_progress: Flow 'icu_step_down.gold.census' is PLANNING.
+[2026-09-25T22:00:54] flow_progress: Flow 'icu_step_down.gold.readiness_training_set' is PLANNING.
+[2026-09-25T22:00:54] flow_progress: Flow 'icu_step_down.gold.census' is STARTING.
+[2026-09-25T22:00:54] flow_progress: Flow 'icu_step_down.gold.readiness_training_set' is STARTING.
+[2026-09-25T22:00:54] flow_progress: Flow 'icu_step_down.gold.census' is RUNNING.
+[2026-09-25T22:00:54] flow_progress: Flow 'icu_step_down.gold.readiness_training_set' is RUNNING.
+[2026-09-25T22:00:57] dataset_life_cycle: Materialized View `icu_step_down`.`gold`.`census` has been created.
+[2026-09-25T22:00:57] flow_progress: Flow 'icu_step_down.gold.census' has COMPLETED.
+[2026-09-25T22:00:58] dataset_life_cycle: Materialized View `icu_step_down`.`gold`.`readiness_training_set` has been created.
+[2026-09-25T22:00:58] flow_progress: Flow 'icu_step_down.gold.readiness_training_set' has COMPLETED.
+[2026-09-25T22:00:58] update_progress: Update a28ac0 is COMPLETED.
+
+## Per-table row counts (queried directly after the run)
+[
+  {
+    "lyr": "bronze",
+    "rows": "58976",
+    "tbl": "admissions"
+  },
+  {
+    "lyr": "bronze",
+    "rows": "38776289",
+    "tbl": "chart_events"
+  },
+  {
+    "lyr": "bronze",
+    "rows": "61532",
+    "tbl": "icu_stays"
+  },
+  {
+    "lyr": "bronze",
+    "rows": "27854055",
+    "tbl": "lab_events"
+  },
+  {
+    "lyr": "bronze",
+    "rows": "46520",
+    "tbl": "patients"
+  },
+  {
+    "lyr": "bronze",
+    "rows": "261897",
+    "tbl": "transfers"
+  },
+  {
+    "lyr": "gold",
+    "rows": "40",
+    "tbl": "census"
+  },
+  {
+    "lyr": "gold",
+    "rows": "61532",
+    "tbl": "patient_features"
+  },
+  {
+    "lyr": "gold",
+    "rows": "61532",
+    "tbl": "readiness_training_set"
+  },
+  {
+    "lyr": "silver",
+    "rows": "61532",
+    "tbl": "icu_stays"
+  },
+  {
+    "lyr": "silver",
+    "rows": "24932835",
+    "tbl": "lab_events"
+  },
+  {
+    "lyr": "silver",
+    "rows": "46520",
+    "tbl": "patients"
+  },
+  {
+    "lyr": "silver",
+    "rows": "21771413",
+    "tbl": "vital_signs"
+  }
+]

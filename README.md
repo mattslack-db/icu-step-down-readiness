@@ -2,7 +2,7 @@
 
 An end-to-end Databricks data journey that helps ICU clinicians identify which patients are ready to be **safely stepped down** from intensive care — freeing scarce ICU beds while protecting patients from premature transfer.
 
-**Live app:** https://icu-step-down-7474646035095173.aws.databricksapps.com
+**Live app:** https://icu-step-down-7474645692590282.aws.databricksapps.com
 
 > Built for the FE Tech Bar. Data is the **publicly available, de-identified MIMIC-III** research dataset (Delta-shared into the workspace). No real/identifiable patient data is committed to this repo — only aggregate counts, metrics, and small samples as run evidence.
 
@@ -50,6 +50,19 @@ flowchart LR
 | Tests | pytest + vitest | 117 backend + 32 frontend + 17 pipeline integration | [08-tests](evidence/08-tests.md) |
 
 All evidence files contain **committed, text-readable run output** (row counts, query results, model metrics, deploy logs) — not screenshots.
+
+### ▶ Raw execution evidence (live-captured)
+
+The [`evidence/raw/`](evidence/raw/) directory holds **verbatim CLI/API output** from live runs against the sandbox (captured 2026-09-25) — proof the build actually executed, not transcribed summaries:
+
+- [`evidence/raw/gold-queries.txt`](evidence/raw/gold-queries.txt) — live SQL results against the governed `icu_step_down.gold.*` tables
+- [`evidence/raw/serving-prediction.txt`](evidence/raw/serving-prediction.txt) — real request/response from the `icu-readiness` Mosaic AI endpoint (`readiness_score` + SHAP factors)
+- [`evidence/raw/genie-qa.txt`](evidence/raw/genie-qa.txt) — five NL questions → generated SQL → result rows via the Genie Conversation API
+- [`evidence/raw/pipeline-run.txt`](evidence/raw/pipeline-run.txt) — Lakeflow pipeline run event log + bronze→silver→gold row counts
+- [`evidence/raw/lakebase-query.txt`](evidence/raw/lakebase-query.txt) — Lakebase synced tables ONLINE + row counts read from Postgres
+- [`evidence/raw/app-deploy.txt`](evidence/raw/app-deploy.txt) — Databricks App RUNNING + startup logs
+
+See [`evidence/raw/README.md`](evidence/raw/README.md) for the capture method and how to reproduce.
 
 ---
 

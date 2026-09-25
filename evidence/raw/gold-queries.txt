@@ -1,0 +1,133 @@
+# Raw query results — icu_step_down.gold (governed Unity Catalog tables)
+# Captured: 2026-09-25T21:46:42Z  |  workspace: fe-sandbox-icu-step-down-readiness  |  profile: icu-sandbox
+# Tool: databricks experimental aitools tools query (Serverless SQL warehouse)
+# These are live query results against the governed gold layer built by the Lakeflow pipeline.
+
+## Q1: gold table row counts
+[
+  {
+    "rows": "40",
+    "tbl": "census"
+  },
+  {
+    "rows": "61532",
+    "tbl": "patient_features"
+  },
+  {
+    "rows": "61532",
+    "tbl": "readiness_training_set"
+  }
+]
+
+## Q2: readiness_training_set label balance (bounce-back proxy)
+[
+  {
+    "n": "1826",
+    "pct": "3.0",
+    "readiness_label": "0"
+  },
+  {
+    "n": "59706",
+    "pct": "97.0",
+    "readiness_label": "1"
+  }
+]
+
+## Q3: vasopressor / ventilator prevalence (patient_features, n=61,532)
+[
+  {
+    "n": "32342",
+    "on_vasopressors": "false",
+    "on_ventilator": "false"
+  },
+  {
+    "n": "11966",
+    "on_vasopressors": "false",
+    "on_ventilator": "true"
+  },
+  {
+    "n": "3207",
+    "on_vasopressors": "true",
+    "on_ventilator": "false"
+  },
+  {
+    "n": "14017",
+    "on_vasopressors": "true",
+    "on_ventilator": "true"
+  }
+]
+
+## Q4: current ICU census — sample feature rows the app scores (5 of 40)
+[
+  {
+    "age": "35.718001",
+    "gcs_last": "10",
+    "hr_mean": "72.7",
+    "icustay_id": "281632",
+    "lactate_last": "2.4",
+    "los_days": "5.12",
+    "on_vasopressors": "false",
+    "on_ventilator": "true",
+    "spo2_mean": "99.7",
+    "subject_id": "19213"
+  },
+  {
+    "age": "35.646817",
+    "gcs_last": "15",
+    "hr_mean": "82.1",
+    "icustay_id": "281499",
+    "lactate_last": "2.8",
+    "los_days": "3.83",
+    "on_vasopressors": "false",
+    "on_ventilator": "false",
+    "spo2_mean": "97.2",
+    "subject_id": "19213"
+  },
+  {
+    "age": "35.794661",
+    "gcs_last": "15",
+    "hr_mean": "78.0",
+    "icustay_id": "224403",
+    "lactate_last": "1.4",
+    "los_days": "3.68",
+    "on_vasopressors": "false",
+    "on_ventilator": "true",
+    "spo2_mean": "94.0",
+    "subject_id": "19213"
+  },
+  {
+    "age": "53.883641",
+    "gcs_last": "15",
+    "hr_mean": "83.7",
+    "icustay_id": "219673",
+    "lactate_last": "",
+    "los_days": "3.1",
+    "on_vasopressors": "false",
+    "on_ventilator": "false",
+    "spo2_mean": "98.2",
+    "subject_id": "21458"
+  },
+  {
+    "age": "81.478439",
+    "gcs_last": "15",
+    "hr_mean": "107.8",
+    "icustay_id": "290671",
+    "lactate_last": "0.6",
+    "los_days": "3.01",
+    "on_vasopressors": "false",
+    "on_ventilator": "false",
+    "spo2_mean": "98.2",
+    "subject_id": "22557"
+  }
+]
+
+## Q5: census cohort summary (age / LOS / support prevalence over the 40 current patients)
+[
+  {
+    "avg_age": "54.8",
+    "avg_los_days": "2.83",
+    "on_pressors": "8",
+    "on_vent": "11",
+    "patients": "40"
+  }
+]

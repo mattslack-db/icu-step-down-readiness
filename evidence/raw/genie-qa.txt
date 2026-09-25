@@ -1,0 +1,54 @@
+# Genie Conversation API — live question/answer capture
+# Captured: 2026-09-25T21:49:42Z  |  space_id: 01f1b92aeef914e383e43c1452d294cf  |  profile: icu-sandbox
+# Method: genie start-conversation -> poll get-message until COMPLETED -> get-message-attachment-query-result
+
+===== Q1: How many current ICU patients are ready for step-down? =====
+conversation_id: 01f1b92b04ae105ab5d6a371f208c3ef
+message_id: 01f1b92b04b9190787c75e2249b47a8f
+status: COMPLETED
+--- generated SQL ---
+SELECT SUM(CASE WHEN `r`.`readiness_label` = 1 THEN 1 ELSE 0 END) AS `ready_for_step_down`, SUM(CASE WHEN `r`.`readiness_label` = 0 THEN 1 ELSE 0 END) AS `not_ready`, COUNT(*) AS `total_current_patients` FROM `icu_step_down`.`gold`.`census` `c` INNER JOIN `icu_step_down`.`gold`.`readiness_training_set` `r` ON `c`.`icustay_id` = `r`.`icustay_id`
+--- result rows ---
+columns: ['ready_for_step_down', 'not_ready', 'total_current_patients']
+rows: [['38', '2', '40']]
+
+===== Q2: What is the average ICU length of stay by readiness band? =====
+conversation_id: 01f1b92b13001e20acd32a33c152a00b
+message_id: 01f1b92b13091d06a0eae3c24d688083
+status: COMPLETED
+--- generated SQL ---
+SELECT `readiness_label`, CASE WHEN `readiness_label` = 1 THEN 'Ready (safe step-down)' ELSE 'Not ready (bounce-back risk)' END AS `readiness_band`, ROUND(AVG(CAST(`los` AS DOUBLE)), 2) AS `avg_los_days`, COUNT(*) AS `num_stays` FROM `icu_step_down`.`gold`.`readiness_training_set` WHERE `los` IS NOT NULL AND `readiness_label` IS NOT NULL GROUP BY `readiness_label` ORDER BY `readiness_label`
+--- result rows ---
+columns: ['readiness_label', 'readiness_band', 'avg_los_days', 'num_stays']
+rows: [['0', 'Not ready (bounce-back risk)', '4.87', '1816'], ['1', 'Ready (safe step-down)', '4.92', '59706']]
+
+===== Q3: How many current patients are on vasopressors and on a ventilator at the same time? =====
+conversation_id: 01f1b92b2184140496bb168e41c76449
+message_id: 01f1b92b218d1945ac95f5d4be2d91ad
+status: COMPLETED
+--- generated SQL ---
+SELECT SUM(CASE WHEN `on_vasopressors` AND `on_ventilator` THEN 1 ELSE 0 END) AS `on_both`, SUM(CASE WHEN `on_vasopressors` THEN 1 ELSE 0 END) AS `on_vasopressors_only`, SUM(CASE WHEN `on_ventilator` THEN 1 ELSE 0 END) AS `on_ventilator_only`, COUNT(*) AS `total_patients` FROM `icu_step_down`.`gold`.`census`
+--- result rows ---
+columns: ['on_both', 'on_vasopressors_only', 'on_ventilator_only', 'total_patients']
+rows: [['5', '8', '11', '40']]
+
+===== Q4: What is the average heart rate and GCS for patients over 65? =====
+conversation_id: 01f1b92b2c74182da5215e1df577f5e7
+message_id: 01f1b92b2c7d19719383595913fd74d6
+status: COMPLETED
+--- generated SQL ---
+SELECT ROUND(AVG(`r`.`hr_mean`), 1) AS `avg_heart_rate_bpm`, ROUND(AVG(CAST(`r`.`gcs_last` AS DOUBLE)), 1) AS `avg_gcs_score`, COUNT(*) AS `num_stays` FROM `icu_step_down`.`gold`.`readiness_training_set` `r` WHERE `r`.`age` > 65 AND `r`.`hr_mean` IS NOT NULL AND `r`.`gcs_last` IS NOT NULL
+--- result rows ---
+columns: ['avg_heart_rate_bpm', 'avg_gcs_score', 'num_stays']
+rows: [['81.5', '13.4', '14812']]
+
+===== Q5: What fraction of ICU stays had a bounce-back within 72 hours? =====
+conversation_id: 01f1b92b3b57116cbedf765c3fdedd3f
+message_id: 01f1b92b3b5f10529d5786086c6bf3d1
+status: COMPLETED
+--- generated SQL ---
+SELECT ROUND(try_divide(SUM(CASE WHEN `readiness_label` = 0 THEN 1 ELSE 0 END) * 100.0,COUNT(*)), 2) AS `bounce_back_pct`, SUM(CASE WHEN `readiness_label` = 0 THEN 1 ELSE 0 END) AS `bounce_back_count`, COUNT(*) AS `total_stays` FROM `icu_step_down`.`gold`.`readiness_training_set`
+--- result rows ---
+columns: ['bounce_back_pct', 'bounce_back_count', 'total_stays']
+rows: [['2.97', '1826', '61532']]
+

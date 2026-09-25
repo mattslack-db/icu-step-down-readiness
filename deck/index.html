@@ -32,6 +32,16 @@
   .nav{cursor:pointer;user-select:none}
   code{background:#eef2f9;padding:1px 6px;border-radius:6px;font-size:.9em}
   @media(prefers-color-scheme:dark){:root{--ink:#e8eefc;--muted:#9fb0cc;--bg:#0b1220;--card:#131c2e;--line:#243149}}
+  @media print{
+    :root{--ink:#0b1324;--muted:#5b6b86;--bg:#fff;--card:#fff;--line:#e2e8f2}
+    html,body{height:auto;background:#fff}
+    #deck{height:auto}
+    footer{display:none}
+    .slide{display:flex!important;min-height:auto;height:100vh;page-break-after:always;break-after:page;padding:8vh 8vw;justify-content:center}
+    .slide:last-child{page-break-after:auto;break-after:auto}
+    .card,.step{box-shadow:none}
+    *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  }
 </style>
 </head>
 <body>
