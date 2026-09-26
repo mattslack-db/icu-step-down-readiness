@@ -102,6 +102,22 @@ SYNCED_TABLES = [
         "source": "icu_step_down.gold.census_vitals",
         "primary_key_columns": ["row_id"],
     },
+    {
+        # FIX I2: drift tile requires this table to be accessible via the Lakebase
+        # (Postgres) session used by the app. gold.readiness_drift lives in UC and
+        # is NOT directly queryable through the Lakebase Postgres connection.
+        #
+        # SNAPSHOT scheduling policy: on each sync, the entire Postgres table is
+        # replaced by the current contents of the Delta source. The drift table
+        # holds exactly two rows per run (PSI and KS); 'metric' is unique in the
+        # snapshot at any point in time, so it serves as a stable primary key.
+        # Freshness lag: the Postgres copy reflects the last completed SNAPSHOT
+        # sync cycle; the drift job does NOT trigger an on-demand re-sync. Typical
+        # lag is one sync interval (configured on the synced table pipeline).
+        "target": f"{LAKEBASE_UC_CATALOG}.{POSTGRES_SCHEMA}.readiness_drift",
+        "source": f"{STORAGE_CATALOG}.gold.readiness_drift",
+        "primary_key_columns": ["metric"],
+    },
 ]
 
 ONLINE_STATE = "SYNCED_TABLE_ONLINE_NO_PENDING_UPDATE"

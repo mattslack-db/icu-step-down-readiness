@@ -341,7 +341,15 @@ def _get_served_model_version() -> str:  # pragma: no cover
 
 
 def _databricks_drift_writer(result: dict[str, Any]) -> None:  # pragma: no cover
-    """Append PSI and KS rows to gold.readiness_drift."""
+    """Append PSI and KS rows to gold.readiness_drift.
+
+    After writing, the Lakebase-synced copy (mimic_iii.readiness_drift) is NOT
+    refreshed on-demand from here. The SNAPSHOT synced table pipeline refreshes on
+    its own schedule. Until the next sync cycle completes, the Lakebase Postgres
+    copy may reflect the previous run's metrics. Typical freshness lag equals one
+    sync interval as configured on the synced table pipeline (see
+    src/lakebase/sync_tables.py, SYNCED_TABLES entry for readiness_drift).
+    """
     from databricks.sdk.runtime import spark  # type: ignore[import-not-found]
 
     spark.sql(_DRIFT_TABLE_DDL)

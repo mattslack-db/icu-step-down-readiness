@@ -69,20 +69,25 @@ _ANALYTICS_SQL = text(
     + " FROM mimic_iii.census"
 )
 
-# Drift SQL: latest PSI row (carries verdict, n_live, model_version, computed_at).
+# Drift SQL: latest PSI row from the Lakebase-synced copy.
+# FIX I2: gold.readiness_drift is a UC Delta table; the app's Lakebase
+# (Postgres) session only exposes the mimic_iii schema. Querying
+# gold.readiness_drift directly from the Postgres session would always fail
+# because the 'gold' schema does not exist in Postgres.  The synced table
+# mimic_iii.readiness_drift (SNAPSHOT mode, PK=metric) is the correct target.
 _DRIFT_PSI_SQL = text(
     "SELECT value, verdict, n_live, model_version, "
     "CAST(computed_at AS VARCHAR) AS computed_at "
-    "FROM gold.readiness_drift "
+    "FROM mimic_iii.readiness_drift "
     "WHERE metric = 'PSI' "
     "ORDER BY computed_at DESC "
     "LIMIT 1"
 )
 
-# Drift SQL: latest KS value (same run, joined by proximity).
+# Drift SQL: latest KS value from the Lakebase-synced copy.
 _DRIFT_KS_SQL = text(
     "SELECT value "
-    "FROM gold.readiness_drift "
+    "FROM mimic_iii.readiness_drift "
     "WHERE metric = 'KS' "
     "ORDER BY computed_at DESC "
     "LIMIT 1"

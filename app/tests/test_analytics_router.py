@@ -14,7 +14,12 @@ from unittest.mock import MagicMock
 import pytest
 
 from icu_step_down.backend.lib.feature_labels import FEATURE_LABELS
-from icu_step_down.backend.routers.analytics import _GLOBAL_FEATURE_IMPORTANCE, get_analytics
+from icu_step_down.backend.routers.analytics import (
+    _DRIFT_KS_SQL,
+    _DRIFT_PSI_SQL,
+    _GLOBAL_FEATURE_IMPORTANCE,
+    get_analytics,
+)
 from icu_step_down.backend.routers.census import FEATURE_COLS
 
 
@@ -127,6 +132,37 @@ def _census_row(icustay_id: str, los: float = 5.0) -> dict:
         else:
             row[col] = None
     return row
+
+
+# ---------------------------------------------------------------------------
+# Drift SQL targets Lakebase schema (FIX I2)
+# ---------------------------------------------------------------------------
+
+
+class TestDriftSqlTargetsLakebase:
+    def test_psi_sql_uses_mimic_iii_schema(self) -> None:
+        """Drift PSI SQL must query the Lakebase mimic_iii schema, not gold."""
+        sql_text = str(_DRIFT_PSI_SQL)
+        assert "mimic_iii.readiness_drift" in sql_text, (
+            "PSI SQL must reference mimic_iii.readiness_drift (Lakebase synced table)"
+        )
+
+    def test_ks_sql_uses_mimic_iii_schema(self) -> None:
+        """Drift KS SQL must query the Lakebase mimic_iii schema, not gold."""
+        sql_text = str(_DRIFT_KS_SQL)
+        assert "mimic_iii.readiness_drift" in sql_text, (
+            "KS SQL must reference mimic_iii.readiness_drift (Lakebase synced table)"
+        )
+
+    def test_psi_sql_does_not_reference_gold_schema(self) -> None:
+        """gold.readiness_drift is a UC table and not queryable via Postgres."""
+        sql_text = str(_DRIFT_PSI_SQL)
+        assert "gold.readiness_drift" not in sql_text
+
+    def test_ks_sql_does_not_reference_gold_schema(self) -> None:
+        """gold.readiness_drift is a UC table and not queryable via Postgres."""
+        sql_text = str(_DRIFT_KS_SQL)
+        assert "gold.readiness_drift" not in sql_text
 
 
 class TestBandDistributionViaRoute:
