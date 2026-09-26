@@ -24,12 +24,28 @@ Tables produced:
 
 from __future__ import annotations
 
+import json
 import logging
 import math
 from datetime import datetime, timezone
 from typing import Any
 
 logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# Feature columns — mirrors src/ml/model.py:FEATURE_COLS exactly.
+# Keep in sync with that file when adding or renaming features.
+# ---------------------------------------------------------------------------
+_FEATURE_COLS: list[str] = [
+    "hr_mean", "hr_min", "hr_max", "hr_last",
+    "sbp_mean", "sbp_min", "sbp_max", "sbp_last",
+    "dbp_mean", "dbp_min", "dbp_max", "dbp_last",
+    "spo2_mean", "spo2_min", "spo2_max", "spo2_last",
+    "temp_c_mean", "temp_c_min", "temp_c_max", "temp_c_last",
+    "rr_mean", "rr_min", "rr_max", "rr_last",
+    "on_vasopressors", "on_ventilator",
+    "gcs_last", "lactate_last", "los", "age",
+]
 
 # ---------------------------------------------------------------------------
 # DDL strings (expressed here; executed at runtime by the controller)
@@ -65,6 +81,24 @@ PARTITIONED BY (DATE(captured_at))
 # ---------------------------------------------------------------------------
 # Pure helpers (testable without Databricks)
 # ---------------------------------------------------------------------------
+
+
+def parse_scores(predictions: list[str]) -> list[float]:
+    """
+    Parse readiness_score values from a list of JSON prediction strings.
+
+    Each string is the JSON output of ReadinessModel.predict:
+        {"readiness_score": float, "factors": [...]}
+
+    Returns a new list of floats (input is not modified).
+
+    Args:
+        predictions: List of JSON strings from the model's "prediction" column.
+
+    Returns:
+        List of readiness_score floats in the same order.
+    """
+    return [float(json.loads(p)["readiness_score"]) for p in predictions]
 
 
 def compute_decile_quantiles(
@@ -126,21 +160,35 @@ def write_training_baseline(
     # Create table if needed
     spark.sql(BASELINE_TABLE_DDL)
 
-    # Score training set via the registered model (or reuse scored output)
-    training_scores_df = spark.sql(
-        f"""
-        SELECT readiness_score
-        FROM   gold.readiness_training_set
-        WHERE  readiness_score IS NOT NULL
-        ORDER BY readiness_score
-        """
+    # Load the registered model — readiness_score does NOT exist as a column in
+    # gold.readiness_training_set; it is computed at serving time.
+    import mlflow  # type: ignore[import-not-found]
+
+    model = mlflow.pyfunc.load_model(
+        f"models:/{_CATALOG}.ml.readiness_model/{model_version}"
     )
-    scores: list[float] = [float(r["readiness_score"]) for r in training_scores_df.collect()]
+
+    # Read the 30 feature columns from the training set (no readiness_score column).
+    feature_select = ", ".join(f"`{c}`" for c in _FEATURE_COLS)
+    training_df = spark.sql(
+        f"SELECT {feature_select} FROM {_CATALOG}.gold.readiness_training_set"
+    )
+    training_pandas = training_df.toPandas()
+
+    if training_pandas.empty:
+        raise ValueError(
+            f"{_CATALOG}.gold.readiness_training_set returned no rows. "
+            "Run the training pipeline before computing the baseline."
+        )
+
+    # Score the training set; parse readiness_score out of the JSON prediction column.
+    predictions_df = model.predict(training_pandas[_FEATURE_COLS])
+    scores: list[float] = parse_scores(list(predictions_df["prediction"]))
 
     if not scores:
         raise ValueError(
-            "gold.readiness_training_set returned no readiness_score values. "
-            "Run the training pipeline before computing the baseline."
+            "Model produced no scores from the training set. "
+            "Check that all feature columns are populated."
         )
 
     deciles = compute_decile_quantiles(scores)
@@ -188,21 +236,53 @@ def append_live_snapshot(
     # Create history table if needed
     spark.sql(HISTORY_TABLE_DDL)
 
+    # Load the registered model — readiness_score does NOT exist as a column in
+    # mimic_iii.census; it must be computed by scoring the feature columns.
+    import mlflow  # type: ignore[import-not-found]
+    import pandas as pd  # type: ignore[import-not-found]
+
+    model = mlflow.pyfunc.load_model(
+        f"models:/{_CATALOG}.ml.readiness_model/{model_version}"
+    )
+
+    # Read icustay_id + feature columns from the synced census table.
+    feature_select = ", ".join(f"`{c}`" for c in _FEATURE_COLS)
+    census_df = spark.sql(
+        f"SELECT icustay_id, {feature_select} FROM mimic_iii.census"
+    )
+    census_pandas = census_df.toPandas()
+
+    if census_pandas.empty:
+        logger.info("No census rows found; skipping live snapshot.")
+        return
+
+    # Score the census rows.
+    predictions_df = model.predict(census_pandas[_FEATURE_COLS])
+    scores = parse_scores(list(predictions_df["prediction"]))
+
+    # Snapshot timestamp truncated to the minute (idempotency guard).
+    now = datetime.now(timezone.utc).replace(second=0, microsecond=0)
+
+    scored_pandas = pd.DataFrame(
+        {
+            "icustay_id": census_pandas["icustay_id"].tolist(),
+            "readiness_score": scores,
+            "model_version": model_version,
+            "captured_at": now,
+        }
+    )
+
+    # Register as a temp view so MERGE can reference it.
+    scored_spark = spark.createDataFrame(scored_pandas)
+    scored_spark.createOrReplaceTempView("_live_snapshot_staging")
+
     # Idempotent insert: only add rows for the current minute if not present.
     spark.sql(
         f"""
         MERGE INTO {HISTORY_TABLE} AS tgt
-        USING (
-            SELECT
-                icustay_id,
-                readiness_score,
-                '{model_version}'                              AS model_version,
-                date_trunc('minute', current_timestamp())      AS captured_at
-            FROM mimic_iii.census
-            WHERE readiness_score IS NOT NULL
-        ) AS src
-        ON  tgt.icustay_id    = src.icustay_id
-        AND tgt.captured_at   = src.captured_at
+        USING _live_snapshot_staging AS src
+        ON  tgt.icustay_id  = src.icustay_id
+        AND tgt.captured_at = src.captured_at
         WHEN NOT MATCHED THEN INSERT *
         """
     )
