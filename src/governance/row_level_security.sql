@@ -53,18 +53,57 @@
 -- A user in none of the four groups matches no branch → returns FALSE → sees
 -- no rows (default deny).
 -- ---------------------------------------------------------------------------
+-- NOTE: uses is_member() (WORKSPACE-group membership), so the four groups are
+-- created as workspace groups — no account-admin rights required. (Switch to
+-- is_account_group_member() if these are provisioned as account groups instead.)
 CREATE OR REPLACE FUNCTION icu_step_down.gold.rls_care_unit(care_unit STRING)
 RETURN
-     is_account_group_member('icu_admins')
-  OR (care_unit = 'MICU' AND is_account_group_member('icu_micu'))
-  OR (care_unit = 'SICU' AND is_account_group_member('icu_sicu'))
-  OR (care_unit = 'CCU'  AND is_account_group_member('icu_ccu'));
+     is_member('icu_admins')
+  OR (care_unit = 'MICU' AND is_member('icu_micu'))
+  OR (care_unit = 'SICU' AND is_member('icu_sicu'))
+  OR (care_unit = 'CCU'  AND is_member('icu_ccu'));
 -- Default deny: a user in none of these groups matches no branch → sees no rows.
 
 -- ---------------------------------------------------------------------------
 -- Bind the row filter to the two operational gold tables.
--- The filter argument ON (care_unit) maps each row's care_unit column value
--- to the care_unit parameter of rls_care_unit above.
+--
+-- ⚠ KNOWN LIMITATION (discovered on apply, 2026-09-26):
+--   gold.census and gold.patient_features are MATERIALIZED VIEWS (built by the
+--   Lakeflow pipeline via CREATE OR REFRESH MATERIALIZED VIEW). Unity Catalog
+--   `ALTER TABLE ... SET ROW FILTER` requires a TABLE and REJECTS a view:
+--     [EXPECT_TABLE_NOT_VIEW.NO_ALTERNATIVE] '... SET ROW FILTER' expects a
+--     table but `icu_step_down`.`gold`.`census` is a view.
+--   So the two ALTER statements below DO NOT WORK against the current gold MVs.
+--
+--   Two viable paths (design decision — not implemented here):
+--   (A) Secure-view pattern (works on MVs today): create governed views, e.g.
+--         CREATE VIEW icu_step_down.gold.census_governed AS
+--           SELECT * FROM icu_step_down.gold.census
+--           WHERE icu_step_down.gold.rls_care_unit(care_unit);
+--       grant consumers the *_governed views instead of the base MVs, and point
+--       Genie / direct-UC consumers at them. (The rls_care_unit function above
+--       is reusable as-is in the view's WHERE clause.)
+--   (B) Materialize gold as managed TABLES (not MVs) so SET ROW FILTER binds
+--       directly — larger pipeline change (loses MV incremental semantics).
+--
+--   The rls_care_unit function IS created above and its is_member() logic is
+--   correct and fail-closed; only the MV binding is blocked.
 -- ---------------------------------------------------------------------------
-ALTER TABLE icu_step_down.gold.census           SET ROW FILTER icu_step_down.gold.rls_care_unit ON (care_unit);
-ALTER TABLE icu_step_down.gold.patient_features SET ROW FILTER icu_step_down.gold.rls_care_unit ON (care_unit);
+-- ALTER TABLE icu_step_down.gold.census           SET ROW FILTER icu_step_down.gold.rls_care_unit ON (care_unit);  -- fails: census is an MV
+-- ALTER TABLE icu_step_down.gold.patient_features SET ROW FILTER icu_step_down.gold.rls_care_unit ON (care_unit);  -- fails: patient_features is an MV
+
+-- ---------------------------------------------------------------------------
+-- DELIVERED APPROACH — secure governed views (path A above).
+-- These work on the MV-backed gold tables today. Grant consumers the *_governed
+-- views instead of the base MVs; point Genie / direct-UC users at them.
+-- Verified live 2026-09-26: with the querying user in NO icu_ group, the
+-- governed view returns 0 rows (fail-closed) while the base MV returns 40.
+-- (Group membership propagates to is_member() on a cache delay of a few minutes.)
+-- ---------------------------------------------------------------------------
+CREATE OR REPLACE VIEW icu_step_down.gold.census_governed AS
+  SELECT * FROM icu_step_down.gold.census
+  WHERE icu_step_down.gold.rls_care_unit(care_unit);
+
+CREATE OR REPLACE VIEW icu_step_down.gold.patient_features_governed AS
+  SELECT * FROM icu_step_down.gold.patient_features
+  WHERE icu_step_down.gold.rls_care_unit(care_unit);
