@@ -303,7 +303,19 @@ SELECT
     (hbw.hb_first IS NOT NULL AND hbw.hb_last IS NOT NULL
      AND (hbw.hb_first - hbw.hb_last) >= 2.0)
     OR cw.hadm_id IS NOT NULL
-  ) AS active_bleeding
+  ) AS active_bleeding,
+  -- -----------------------------------------------------------------------
+  -- Synthetic care-unit dimension (Phase 3)
+  -- Deterministic assignment from icustay_id modulo 3 so the value is
+  -- stable across pipeline re-runs.
+  -- NOTE: care_unit is a synthetic demo dimension over de-identified data;
+  -- it does NOT reflect the patient's actual physical care unit in MIMIC-III.
+  -- -----------------------------------------------------------------------
+  CASE pmod(CAST(icustay_id AS BIGINT), 3)
+    WHEN 0 THEN 'MICU'
+    WHEN 1 THEN 'SICU'
+    ELSE        'CCU'
+  END AS care_unit
 FROM stay_windows sw
 JOIN icu_step_down.silver.patients p
   ON p.subject_id = sw.subject_id
@@ -394,6 +406,7 @@ WITH recent_stays_with_vitals AS (
   ORDER BY s.intime DESC
   LIMIT 40
 )
+-- care_unit propagates automatically because census is SELECT pf.* from patient_features.
 SELECT pf.*
 FROM icu_step_down.gold.patient_features pf
 JOIN recent_stays_with_vitals rs
