@@ -25,6 +25,7 @@ from ..core.dependencies import Dependencies
 from ..genai.narrative import Factor, build_narrative
 from ..lib.care_plan import build_care_plan
 from ..lib.feature_labels import normalize_factor
+from ..lib.guardrails import GUARDRAILS
 from ..lib.readiness import compute_readiness_index, readiness_band_from_index
 from ..models import CarePlanOut, FactorOut, MonitoringItemOut, PatientDetail, PatientFeatures, VitalPoint
 from .census import (
@@ -48,6 +49,8 @@ router = APIRouter(prefix="/api", tags=["patients"])
 _DETAIL_EXTRA_COLS = [
     "icustay_id", "subject_id", "los", "age",
     "on_vasopressors", "on_ventilator",
+    # Derived guardrail flags (Phase 2) — used to inject risk factors
+    "recent_extubation", "active_bleeding",
     "hr_mean", "sbp_mean", "dbp_mean", "spo2_mean", "spo2_min",
     "temp_c_mean", "rr_mean", "gcs_last", "lactate_last",
 ]
@@ -263,6 +266,37 @@ def get_patient(
             for f in raw_factors
         )
     ]
+
+    # --- 6b. Inject derived-flag guardrail risk factors ---
+    # For each inject_risk guardrail, if the census row has the flag set and the
+    # label is not already present, insert a synthetic risk factor at the top of
+    # the list (magnitude = max existing + epsilon).  Dedup is label-based so a
+    # model factor carrying the same label is never double-counted.
+    existing_labels: set[str] = {f.name for f in response_factors}
+    max_magnitude: float = max(
+        (f.magnitude for f in response_factors), default=0.0
+    )
+    _INJECT_EPSILON: float = 1e-4
+    injected: list[FactorOut] = []
+    for g in GUARDRAILS:
+        if g.kind != "inject_risk":
+            continue
+        if not _to_bool(row.get(g.feature, False)):
+            continue
+        if g.label in existing_labels:
+            continue
+        injected.append(FactorOut(
+            name=g.label,
+            direction="risk",
+            magnitude=max_magnitude + _INJECT_EPSILON,
+        ))
+        existing_labels.add(g.label)
+    if injected:
+        response_factors = sorted(
+            injected + response_factors,
+            key=lambda f: f.magnitude,
+            reverse=True,
+        )
 
     # --- 7. Build deterministic care plan ---
     normalized_factor_tuples = [
