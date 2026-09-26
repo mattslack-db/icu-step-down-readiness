@@ -56,6 +56,7 @@ _CATALOG = "icu_step_down"
 
 BASELINE_TABLE = f"{_CATALOG}.gold.readiness_training_baseline"
 HISTORY_TABLE = f"{_CATALOG}.gold.readiness_score_history"
+CENSUS_SOURCE = f"{_CATALOG}.gold.census"
 
 BASELINE_TABLE_DDL = f"""
 CREATE TABLE IF NOT EXISTS {BASELINE_TABLE} (
@@ -88,7 +89,7 @@ def _coerce_feature_frame(df: "pd.DataFrame") -> "pd.DataFrame":
 
     MLflow signature enforcement for the readiness model declares
     on_vasopressors and on_ventilator as double (required), but the upstream
-    Delta tables (gold.readiness_training_set, mimic_iii.census) store them
+    Delta tables (gold.readiness_training_set, gold.census) store them
     as BOOLEAN.  MLflow will NOT auto-cast bool → float64 during signature
     enforcement — the cast must happen before model.predict is called.
 
@@ -273,7 +274,7 @@ def append_live_snapshot(
     spark.sql(HISTORY_TABLE_DDL)
 
     # Load the registered model — readiness_score does NOT exist as a column in
-    # mimic_iii.census; it must be computed by scoring the feature columns.
+    # gold.census; it must be computed by scoring the feature columns.
     import mlflow  # type: ignore[import-not-found]
     import pandas as pd  # type: ignore[import-not-found]
 
@@ -281,10 +282,10 @@ def append_live_snapshot(
         f"models:/{_CATALOG}.ml.readiness_model/{model_version}"
     )
 
-    # Read icustay_id + feature columns from the synced census table.
+    # Read icustay_id + feature columns from the governed UC gold census table.
     feature_select = ", ".join(f"`{c}`" for c in _FEATURE_COLS)
     census_df = spark.sql(
-        f"SELECT icustay_id, {feature_select} FROM mimic_iii.census"
+        f"SELECT icustay_id, {feature_select} FROM {CENSUS_SOURCE}"
     )
     census_pandas = census_df.toPandas()
 

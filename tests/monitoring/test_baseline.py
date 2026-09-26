@@ -18,12 +18,36 @@ import pytest
 import pandas as pd
 
 from src.monitoring.baseline import (
+    _CATALOG,
     _FEATURE_COLS,
+    CENSUS_SOURCE,
     _coerce_feature_frame,
     compute_decile_quantiles,
     parse_scores,
     HISTORY_TABLE_DDL,
 )
+
+# ---------------------------------------------------------------------------
+# CENSUS_SOURCE — source table constant guard
+# ---------------------------------------------------------------------------
+
+
+class TestCensusSource:
+    def test_census_source_equals_uc_gold_census(self) -> None:
+        """CENSUS_SOURCE must point to the governed UC gold census table."""
+        assert CENSUS_SOURCE == "icu_step_down.gold.census"
+
+    def test_census_source_uses_catalog_constant(self) -> None:
+        """CENSUS_SOURCE must be derived from _CATALOG for consistency."""
+        assert CENSUS_SOURCE == f"{_CATALOG}.gold.census"
+
+    def test_census_source_is_three_part_name(self) -> None:
+        """CENSUS_SOURCE must be a 3-part Unity Catalog name (catalog.schema.table)."""
+        parts = CENSUS_SOURCE.split(".")
+        assert len(parts) == 3, (
+            f"CENSUS_SOURCE '{CENSUS_SOURCE}' must be a 3-part name; got {len(parts)} parts."
+        )
+
 
 # ---------------------------------------------------------------------------
 # HISTORY_TABLE_DDL — schema guard
