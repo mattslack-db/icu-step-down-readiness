@@ -28,6 +28,18 @@
 --   3. Add the app service principal to icu_admins.
 --   4. Verify: as icu_admins → 40 rows; as icu_micu → MICU rows only;
 --      as a member of no group → 0 rows.
+--
+-- ⚠ GOVERNANCE SCOPE — UC filter vs. Lakebase app path:
+--   This row filter governs DIRECT Unity Catalog / SQL-warehouse access to
+--   gold.census and gold.patient_features. It does NOT apply to the Databricks
+--   App, which reads Lakebase-synced Postgres copies (mimic_iii.census,
+--   mimic_iii.patient_features) using the app service principal (icu_admins).
+--   Because the app SP is in icu_admins, it sees all rows from all care units;
+--   the UC row filter is bypassed on the Lakebase path entirely.
+--
+--   App-level per-team scoping is a documented follow-up (not implemented here).
+--   See README.md § Governance and
+--   app/src/icu_step_down/backend/lib/access.py (care_unit_filter_for_user).
 -- =============================================================================
 
 
