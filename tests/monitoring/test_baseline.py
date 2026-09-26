@@ -14,7 +14,71 @@ import json
 
 import pytest
 
-from src.monitoring.baseline import compute_decile_quantiles, parse_scores
+from src.monitoring.baseline import _FEATURE_COLS, compute_decile_quantiles, parse_scores
+
+# ---------------------------------------------------------------------------
+# Guard: _FEATURE_COLS must stay in sync with src.ml.model.FEATURE_COLS
+# ---------------------------------------------------------------------------
+# src/ml/model.py runs mlflow.models.set_model() and imports mlflow/lgbm/shap
+# at module load, so we can't unconditionally import it in every test run.
+# Strategy:
+#   1. Try to import — if mlflow is available, assert exact list equality.
+#   2. If mlflow is absent (importorskip skips gracefully), fall back to a
+#      structural guard: length == 30 and the known tail matches exactly.
+# ---------------------------------------------------------------------------
+
+
+_KNOWN_TAIL = [
+    "on_vasopressors", "on_ventilator",
+    "gcs_last", "lactate_last", "los", "age",
+]
+_KNOWN_HEAD = ["hr_mean", "hr_min", "hr_max", "hr_last"]
+
+
+class TestFeatureColsGuard:
+    def test_feature_cols_length_is_30(self) -> None:
+        """_FEATURE_COLS must have exactly 30 entries (matching FEATURE_COLS in model.py)."""
+        assert len(_FEATURE_COLS) == 30, (
+            f"_FEATURE_COLS has {len(_FEATURE_COLS)} entries; expected 30. "
+            "Update baseline._FEATURE_COLS to match src/ml/model.py:FEATURE_COLS."
+        )
+
+    def test_feature_cols_head_matches_model(self) -> None:
+        """First four entries must be the heart-rate stats (hr_mean/min/max/last)."""
+        assert list(_FEATURE_COLS[:4]) == _KNOWN_HEAD, (
+            f"Head mismatch: {_FEATURE_COLS[:4]!r} != {_KNOWN_HEAD!r}. "
+            "Keep baseline._FEATURE_COLS in sync with src/ml/model.py:FEATURE_COLS."
+        )
+
+    def test_feature_cols_tail_matches_model(self) -> None:
+        """Last six entries must match the known tail of FEATURE_COLS."""
+        assert list(_FEATURE_COLS[-6:]) == _KNOWN_TAIL, (
+            f"Tail mismatch: {_FEATURE_COLS[-6:]!r} != {_KNOWN_TAIL!r}. "
+            "Keep baseline._FEATURE_COLS in sync with src/ml/model.py:FEATURE_COLS."
+        )
+
+    def test_feature_cols_no_duplicates(self) -> None:
+        """_FEATURE_COLS must not contain duplicate column names."""
+        assert len(_FEATURE_COLS) == len(set(_FEATURE_COLS)), (
+            "Duplicate entries found in baseline._FEATURE_COLS."
+        )
+
+    def test_feature_cols_exact_equality_with_model_when_mlflow_available(
+        self,
+    ) -> None:
+        """
+        When mlflow is importable, assert exact list + order equality with
+        src.ml.model.FEATURE_COLS.  Skipped automatically when mlflow/lightgbm
+        are not installed in the test environment.
+        """
+        mlflow = pytest.importorskip("mlflow", reason="mlflow not installed — skipping exact equality check")
+        pytest.importorskip("lightgbm", reason="lightgbm not installed — skipping exact equality check")
+        # Both heavy deps present; the module-level set_model() will run on import.
+        from src.ml.model import FEATURE_COLS as MODEL_FEATURE_COLS  # noqa: PLC0415
+        assert list(_FEATURE_COLS) == list(MODEL_FEATURE_COLS), (
+            "baseline._FEATURE_COLS diverged from src/ml/model.py:FEATURE_COLS. "
+            "Update the mirror in baseline.py to match exactly."
+        )
 
 
 # ---------------------------------------------------------------------------

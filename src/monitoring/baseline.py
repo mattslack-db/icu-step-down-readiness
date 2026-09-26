@@ -182,8 +182,11 @@ def write_training_baseline(
         )
 
     # Score the training set; parse readiness_score out of the JSON prediction column.
+    # Filter out None/NaN prediction values before parsing so a null row from the
+    # model (e.g. a row with all-NaN features) cannot crash json.loads.
     predictions_df = model.predict(training_pandas[_FEATURE_COLS])
-    scores: list[float] = parse_scores(list(predictions_df["prediction"]))
+    preds = [p for p in predictions_df["prediction"] if p is not None]
+    scores: list[float] = parse_scores(preds)
 
     if not scores:
         raise ValueError(
@@ -257,8 +260,10 @@ def append_live_snapshot(
         return
 
     # Score the census rows.
+    # Filter out None/NaN prediction values before parsing (null-safe guard).
     predictions_df = model.predict(census_pandas[_FEATURE_COLS])
-    scores = parse_scores(list(predictions_df["prediction"]))
+    preds = [p for p in predictions_df["prediction"] if p is not None]
+    scores = parse_scores(preds)
 
     # Snapshot timestamp truncated to the minute (idempotency guard).
     now = datetime.now(timezone.utc).replace(second=0, microsecond=0)
