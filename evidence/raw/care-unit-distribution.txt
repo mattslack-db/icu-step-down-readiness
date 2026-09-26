@@ -1,0 +1,35 @@
+# Synthetic care_unit dimension — gold (Phase 3.1)
+# Captured: 2026-09-26T19:20:46Z | profile: icu-sandbox | pipeline update: 04efe56a-eeef-4013-8f70-1bdee52a7291
+# care_unit = CASE pmod(CAST(sw.icustay_id AS BIGINT),3) -> MICU/SICU/CCU (synthetic; de-identified data).
+
+## Census distribution by care_unit (n=40)
+[
+  {
+    "care_unit": "CCU",
+    "n": "15"
+  },
+  {
+    "care_unit": "MICU",
+    "n": "15"
+  },
+  {
+    "care_unit": "SICU",
+    "n": "10"
+  }
+]
+
+## Full-cohort distribution (n=61,532)
+[
+  {
+    "care_unit": "CCU",
+    "n": "20464"
+  },
+  {
+    "care_unit": "MICU",
+    "n": "20550"
+  },
+  {
+    "care_unit": "SICU",
+    "n": "20518"
+  }
+]
