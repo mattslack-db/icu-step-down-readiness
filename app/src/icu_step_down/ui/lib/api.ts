@@ -26,6 +26,11 @@ export interface BandCount {
     count: number;
     pct: number;
 }
+export interface CarePlanOut {
+    basis: string;
+    monitoring: MonitoringItemOut[];
+    next_check_in_hours: number;
+}
 export interface CensusPatient {
     age: number;
     band: string;
@@ -62,12 +67,18 @@ export interface FeatureImportanceItem {
 export interface HTTPValidationError {
     detail?: ValidationError[];
 }
+export interface MonitoringItemOut {
+    parameter: string;
+    rationale: string;
+    threshold: string;
+}
 export interface Name {
     family_name?: string | null;
     given_name?: string | null;
 }
 export interface PatientDetail {
     band: string;
+    care_plan: CarePlanOut;
     factors: FactorOut[];
     features: PatientFeatures;
     lactate_note: string | null;

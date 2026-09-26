@@ -23,9 +23,10 @@ from sqlmodel import text
 
 from ..core.dependencies import Dependencies
 from ..genai.narrative import Factor, build_narrative
+from ..lib.care_plan import build_care_plan
 from ..lib.feature_labels import normalize_factor
 from ..lib.readiness import compute_readiness_index, readiness_band_from_index
-from ..models import FactorOut, PatientDetail, PatientFeatures, VitalPoint
+from ..models import CarePlanOut, FactorOut, MonitoringItemOut, PatientDetail, PatientFeatures, VitalPoint
 from .census import (
     FEATURE_COLS,
     _build_record,
@@ -128,8 +129,10 @@ def get_patient(
        endpoint for the whole census in one shot.
     4. Key predictions by icustay_id — never by row position.
     5. Compute relative readiness index from the full census score distribution.
-    6. Generate Gen AI clinical narrative (LLaMA-3.3-70B).
-    7. Return assembled PatientDetail.
+    6. Build response factors (sorted by magnitude, direction-corrected).
+    7. Build deterministic care plan (next check-in + monitoring thresholds).
+    8. Generate Gen AI clinical narrative (LLaMA-3.3-70B) with care plan.
+    9. Return assembled PatientDetail.
 
     All DB and serving errors surface as explicit HTTP errors; none are swallowed.
     """
@@ -261,7 +264,30 @@ def get_patient(
         )
     ]
 
-    # --- 7. Generate Gen AI narrative ---
+    # --- 7. Build deterministic care plan ---
+    normalized_factor_tuples = [
+        normalize_factor(
+            f.get("name", ""),
+            f.get("direction", "risk"),
+            float(f.get("magnitude", 0.0)),
+        )
+        for f in raw_factors
+    ]
+    care_plan_obj = build_care_plan(band, normalized_factor_tuples)
+    care_plan_out = CarePlanOut(
+        next_check_in_hours=care_plan_obj.next_check_in_hours,
+        monitoring=[
+            MonitoringItemOut(
+                parameter=m.parameter,
+                threshold=m.threshold,
+                rationale=m.rationale,
+            )
+            for m in care_plan_obj.monitoring
+        ],
+        basis=care_plan_obj.basis,
+    )
+
+    # --- 8. Generate Gen AI narrative (with care plan for verbatim restatement) ---
     narrative_factors = _build_narrative_factors(raw_factors)
     try:
         # Pass an index-derived representative score so the narrative band label
@@ -272,7 +298,11 @@ def get_patient(
             "Borderline": 0.60,
             "Not ready": 0.20,
         }.get(band, patient_score)
-        narrative = build_narrative(_band_score_hint, narrative_factors)
+        narrative = build_narrative(
+            _band_score_hint,
+            narrative_factors,
+            care_plan=care_plan_obj,
+        )
     except Exception as exc:
         logger.warning("Gen AI narrative generation failed: %s", exc)
         narrative = f"Clinical narrative unavailable ({exc}). Readiness band: {band}."
@@ -283,7 +313,7 @@ def get_patient(
         _LACTATE_NOTE if "lactate_last" in raw_factor_names else None
     )
 
-    # --- 8. Assemble and return ---
+    # --- 9. Assemble and return ---
     features = PatientFeatures(
         icustay_id=str(row["icustay_id"]),
         subject_id=str(row["subject_id"]),
@@ -311,4 +341,5 @@ def get_patient(
         factors=response_factors,
         narrative=narrative,
         lactate_note=lactate_note,
+        care_plan=care_plan_out,
     )

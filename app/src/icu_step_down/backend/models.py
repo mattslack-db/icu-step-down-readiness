@@ -86,6 +86,32 @@ class CensusResponse(BaseModel):
 # ---------------------------------------------------------------------------
 
 
+class MonitoringItemOut(BaseModel):
+    """A single monitoring threshold item from the care plan."""
+
+    parameter: str
+    """Clinical parameter to monitor (e.g. 'lactate', 'heart rate')."""
+
+    threshold: str
+    """Threshold and action string (e.g. 'recheck in 6h; escalate if >2.0 mmol/L')."""
+
+    rationale: str
+    """Brief rationale for including this parameter in the care plan."""
+
+
+class CarePlanOut(BaseModel):
+    """Deterministic care plan: next check-in interval and monitoring thresholds."""
+
+    next_check_in_hours: int
+    """Recommended reassessment interval in hours (4, 6, or 12)."""
+
+    monitoring: list[MonitoringItemOut]
+    """Monitoring thresholds for the top clinical parameters."""
+
+    basis: str
+    """Description of how this plan was derived (band + factor count)."""
+
+
 class VitalPoint(BaseModel):
     """Single time-stamped vital sign reading."""
 
@@ -134,6 +160,9 @@ class PatientDetail(BaseModel):
 
     lactate_note: str | None
     """Present when lactate_last is a top factor — explains the measured-vs-null signal."""
+
+    care_plan: CarePlanOut
+    """Deterministic care plan: next check-in interval and monitoring thresholds."""
 
 
 # ---------------------------------------------------------------------------
