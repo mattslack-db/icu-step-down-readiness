@@ -105,6 +105,10 @@ databricks bundle deploy   -t sandbox --profile icu-sandbox   # pipeline, model 
 - **Lakebase sync:** `python src/lakebase/sync_tables.py` (idempotent).
 - **Tests:** `cd app && uv run pytest` (backend, 117) · `cd app && bunx vitest run` (frontend, 32) · `pytest tests/integration -m integration` (pipeline, 17 — needs the `icu-sandbox` profile + `databricks-sql-connector`).
 
+## Governance
+
+Unity Catalog governance (comments, PII tags, grants) is defined in [`src/governance/governance.sql`](src/governance/governance.sql). Unit-level row-access control — a fail-closed row filter on `census` and `patient_features` scoped to UC account groups `icu_admins`, `icu_micu`, `icu_sicu`, `icu_ccu` — is defined in [`src/governance/row_level_security.sql`](src/governance/row_level_security.sql). Both files must be re-run after any Lakeflow pipeline recreate because Materialized View metadata (comments, tags, and row-filter bindings) is lost on DROP/CREATE.
+
 ## Model honesty
 
 The readiness model (LightGBM on 24h vital/lab/status features) predicts safe step-down (no ICU readmission within 72h). It is intentionally framed as a **relative ranking / decision-support** tool:

@@ -137,3 +137,13 @@ GRANT USE CATALOG ON CATALOG icu_step_down TO `account users`;
 --   to the ML pipeline service principal only; SELECT ON SCHEMA here is a sandbox/demo
 --   choice that grants all account users access to the full gold layer.
 GRANT USE SCHEMA, SELECT ON SCHEMA icu_step_down.gold TO `account users`;
+
+-- ---------------------------------------------------------------------------
+-- SECTION 5 — Row-level security (Phase 3)
+--
+-- Unit-level row filtering for census and patient_features is defined in
+-- src/governance/row_level_security.sql and MUST also be re-run after any
+-- pipeline recreate (SET ROW FILTER bindings are lost when a Materialized View
+-- is dropped and recreated, for the same reason as the COMMENT/TAG metadata
+-- above).
+-- ---------------------------------------------------------------------------
