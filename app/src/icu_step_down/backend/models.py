@@ -185,6 +185,28 @@ class FeatureImportanceItem(BaseModel):
     """Mean |SHAP| value from the global feature importance analysis."""
 
 
+class DriftStatus(BaseModel):
+    """Latest drift-check result from gold.readiness_drift."""
+
+    psi: float
+    """Population Stability Index — ~0 for stable, >0.25 indicates drift."""
+
+    ks: float
+    """Kolmogorov-Smirnov statistic — max CDF gap between baseline and live."""
+
+    verdict: str
+    """One of: 'insufficient', 'stable', 'moderate', 'drift'."""
+
+    n_live: int
+    """Number of live scores used in this drift check."""
+
+    model_version: str
+    """Model version the baseline was computed against."""
+
+    computed_at: str
+    """ISO-8601 UTC timestamp of the drift check run."""
+
+
 class AnalyticsResponse(BaseModel):
     """Response for GET /api/analytics."""
 
@@ -205,3 +227,9 @@ class AnalyticsResponse(BaseModel):
     """Fraction of current census on vasopressors (0–1)."""
 
     generated_at: str
+
+    drift_status: DriftStatus | None = None
+    """
+    Latest drift-check result from gold.readiness_drift, or None when the
+    drift table has not yet been populated (graceful degradation).
+    """

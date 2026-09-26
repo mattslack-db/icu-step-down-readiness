@@ -1,0 +1,24 @@
+## ICU Step-Down Readiness — Drift Check Run Evidence (Phase 4.2)
+
+Status: DEFERRED TO CONTROLLER
+Reason: Databricks job deploy and execution are not performed by the implementation agent.
+
+Job resource: resources/jobs.yml (icu-readiness-drift-check)
+Entry point: src/monitoring/drift_check.py
+Schedule: daily at 06:00 UTC
+
+Expected output in gold.readiness_drift:
+    metric        STRING      -- 'PSI'
+    value         DOUBLE      -- PSI value (e.g. 0.04 for stable)
+    verdict       STRING      -- 'stable' | 'moderate' | 'drift' | 'insufficient'
+    n_live        INT         -- number of live scores compared
+    model_version STRING      -- model version (e.g. '2')
+    computed_at   TIMESTAMP   -- when the check ran
+
+Analytics endpoint (GET /api/analytics) returns drift_status field populated
+from this table, or null when the table has not yet been written (graceful
+degradation confirmed by vitest assertion in analytics.test.tsx).
+
+Deploy commands (controller):
+    databricks bundle deploy -t sandbox
+    databricks bundle run -t sandbox icu_readiness_drift_check

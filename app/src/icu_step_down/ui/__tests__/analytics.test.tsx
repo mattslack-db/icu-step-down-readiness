@@ -31,6 +31,15 @@ import { useGetAnalyticsSuspense } from "@/lib/api";
 
 // ─── Test data ──────────────────────────────────────────────────────────────
 
+const MOCK_DRIFT: AnalyticsResponse["drift_status"] = {
+  psi: 0.07,
+  ks: 0.12,
+  verdict: "stable",
+  n_live: 150,
+  model_version: "2",
+  computed_at: "2026-09-26T06:00:00.000Z",
+};
+
 const MOCK_ANALYTICS: AnalyticsResponse = {
   total_census: 40,
   generated_at: "2026-09-08T10:00:00.000Z",
@@ -47,6 +56,7 @@ const MOCK_ANALYTICS: AnalyticsResponse = {
   avg_los_by_band: { Ready: 2.5, Borderline: 4.1, "Not ready": 8.3 },
   vent_rate: 0.12,
   vasopressor_rate: 0.08,
+  drift_status: MOCK_DRIFT,
 };
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -121,5 +131,24 @@ describe("AnalyticsContent — analytics view", () => {
     renderAnalytics();
     expect(screen.getByText(/relative/i)).toBeInTheDocument();
     expect(screen.getByText(/index, not probability/i)).toBeInTheDocument();
+  });
+
+  it("renders the drift monitor tile with PSI value when drift data is present", () => {
+    renderAnalytics();
+    // The tile heading must appear
+    expect(screen.getByText(/model drift monitor/i)).toBeInTheDocument();
+    // PSI value rendered (0.07 → "0.070")
+    expect(screen.getByText("0.070")).toBeInTheDocument();
+    // Verdict "Stable" is shown
+    expect(screen.getByText("Stable")).toBeInTheDocument();
+  });
+
+  it("renders the drift monitor tile in no-data state when drift_status is null", () => {
+    (useGetAnalyticsSuspense as ReturnType<typeof vi.fn>).mockReturnValue({
+      data: { ...MOCK_ANALYTICS, drift_status: null },
+    });
+    render(<AnalyticsContent />);
+    expect(screen.getByText(/model drift monitor/i)).toBeInTheDocument();
+    expect(screen.getByText(/daily drift-check job has not run/i)).toBeInTheDocument();
   });
 });
