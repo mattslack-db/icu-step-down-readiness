@@ -311,7 +311,7 @@ SELECT
   -- NOTE: care_unit is a synthetic demo dimension over de-identified data;
   -- it does NOT reflect the patient's actual physical care unit in MIMIC-III.
   -- -----------------------------------------------------------------------
-  CASE pmod(CAST(icustay_id AS BIGINT), 3)
+  CASE pmod(CAST(sw.icustay_id AS BIGINT), 3)
     WHEN 0 THEN 'MICU'
     WHEN 1 THEN 'SICU'
     ELSE        'CCU'
