@@ -1,0 +1,23 @@
+## ICU Step-Down Readiness — Training Baseline Evidence (Phase 4.1)
+
+Status: DEFERRED TO CONTROLLER
+Reason: Databricks execution is not performed by the implementation agent.
+
+Script: src/monitoring/baseline.py
+Command: python -m src.monitoring.baseline 2
+Expected output: 11 decile rows written to gold.readiness_training_baseline
+                 Live snapshot appended to gold.readiness_score_history
+
+DDL for gold.readiness_training_baseline:
+    quantile      DOUBLE      NOT NULL,
+    score         DOUBLE      NOT NULL,
+    model_version STRING      NOT NULL,
+    computed_at   TIMESTAMP   NOT NULL
+
+DDL for gold.readiness_score_history:
+    icustay_id      STRING      NOT NULL,
+    readiness_score DOUBLE      NOT NULL,
+    model_version   STRING      NOT NULL,
+    captured_at     TIMESTAMP   NOT NULL
+
+The controller must run baseline.py before deploying the drift-check job.
