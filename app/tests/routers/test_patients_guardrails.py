@@ -260,3 +260,43 @@ def test_injected_factor_magnitude_exceeds_existing_factors():
         if f.name != "active bleeding / coagulopathy"
     )
     assert injected.magnitude > max_model_magnitude
+
+
+# ---------------------------------------------------------------------------
+# Tests: top-N truncation (I2)
+# ---------------------------------------------------------------------------
+
+
+def test_top_n_truncation_with_inject_risk_flag():
+    """
+    When 5 model factors are returned AND an inject_risk flag is set,
+    the response must contain exactly TOP_N_DISPLAY_FACTORS (5) factors,
+    the injected guardrail factor must be present (it has max+epsilon
+    magnitude so it sorts first and a low-magnitude model factor is dropped),
+    and all 5 must have direction "risk" or "supports" (no phantom entries).
+    """
+    from icu_step_down.backend.routers.patients import TOP_N_DISPLAY_FACTORS
+
+    # Arrange: 5 model factors with distinct magnitudes
+    model_factors = [
+        {"name": f"feature_{i}", "direction": "risk", "magnitude": float(i) * 0.05}
+        for i in range(1, 6)
+    ]  # magnitudes: 0.05, 0.10, 0.15, 0.20, 0.25
+    row = _census_row("999004", active_bleeding=True)
+    ws = _make_ws(score=0.48, factors=model_factors)
+
+    # Act
+    detail = _call_patient("999004", row, ws)
+
+    # Assert: exactly TOP_N_DISPLAY_FACTORS entries
+    assert len(detail.factors) == TOP_N_DISPLAY_FACTORS
+
+    # Injected guardrail factor is present (sorted to top)
+    labels = [f.name for f in detail.factors]
+    assert "active bleeding / coagulopathy" in labels
+
+    # The lowest-magnitude model factor (feature_1, magnitude 0.05) was dropped
+    assert "feature_1" not in labels
+
+    # All entries have valid directions
+    assert all(f.direction in ("risk", "supports") for f in detail.factors)

@@ -262,6 +262,7 @@ coag_window AS (
   JOIN stay_windows sw ON sw.hadm_id = le.hadm_id
   WHERE le.charttime >= sw.window_start
     AND le.charttime <  sw.window_end
+    AND le.valuenum IS NOT NULL
     AND (
       (le.itemid = 51237 AND le.valuenum > 1.5)    -- INR > 1.5
       OR (le.itemid = 51265 AND le.valuenum < 50)  -- Platelets < 50k/μL

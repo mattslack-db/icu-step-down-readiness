@@ -85,6 +85,15 @@ _CENSUS_BATCH_SQL = text(
 # Helper
 # ---------------------------------------------------------------------------
 
+# Maximum factors returned in the patient detail response, matching the model's
+# own TOP_N_FACTORS cap.  Guardrail injection can add up to len(inject_risk
+# guardrails) factors; truncating here keeps the list at a predictable size.
+TOP_N_DISPLAY_FACTORS: int = 5
+
+# Small epsilon added to the max existing magnitude when injecting a guardrail
+# factor, ensuring it sorts to the top of the list.
+_INJECT_EPSILON: float = 1e-4
+
 _LACTATE_NOTE = (
     "Lactate is the dominant model feature. When lactate is *measured*, "
     "even a low value signals a more complex stay; when it is *absent* (NULL), "
@@ -276,7 +285,6 @@ def get_patient(
     max_magnitude: float = max(
         (f.magnitude for f in response_factors), default=0.0
     )
-    _INJECT_EPSILON: float = 1e-4
     injected: list[FactorOut] = []
     for g in GUARDRAILS:
         if g.kind != "inject_risk":
@@ -296,7 +304,7 @@ def get_patient(
             injected + response_factors,
             key=lambda f: f.magnitude,
             reverse=True,
-        )
+        )[:TOP_N_DISPLAY_FACTORS]
 
     # --- 7. Build deterministic care plan ---
     normalized_factor_tuples = [
