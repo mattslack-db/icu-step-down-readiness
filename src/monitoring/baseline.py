@@ -83,6 +83,37 @@ PARTITIONED BY (DATE(captured_at))
 # ---------------------------------------------------------------------------
 
 
+def _coerce_feature_frame(df: "pd.DataFrame") -> "pd.DataFrame":
+    """
+    Return a new DataFrame with boolean feature columns cast to float64.
+
+    MLflow signature enforcement for the readiness model declares
+    on_vasopressors and on_ventilator as double (required), but the upstream
+    Delta tables (gold.readiness_training_set, mimic_iii.census) store them
+    as BOOLEAN.  MLflow will NOT auto-cast bool → float64 during signature
+    enforcement — the cast must happen before model.predict is called.
+
+    The function is dtype-driven (not hardcoded column names) so it handles
+    any boolean column present in the DataFrame, including future additions.
+    The input frame is never mutated; a new copy is always returned.
+
+    Args:
+        df: Feature DataFrame loaded from a Delta table (may contain bool cols).
+
+    Returns:
+        New DataFrame with all bool/boolean columns cast to float64; all
+        other columns are unchanged.
+    """
+    import pandas as pd  # type: ignore[import-not-found]  # noqa: PLC0415
+
+    bool_casts = {
+        col: df[col].astype("float64")
+        for col in df.columns
+        if str(df[col].dtype) in ("bool", "boolean")
+    }
+    return df.assign(**bool_casts) if bool_casts else df.copy()
+
+
 def parse_scores(predictions: list[str]) -> list[float]:
     """
     Parse readiness_score values from a list of JSON prediction strings.
@@ -184,7 +215,10 @@ def write_training_baseline(
     # Score the training set; parse readiness_score out of the JSON prediction column.
     # Filter out None/NaN prediction values before parsing so a null row from the
     # model (e.g. a row with all-NaN features) cannot crash json.loads.
-    predictions_df = model.predict(training_pandas[_FEATURE_COLS])
+    # Coerce bool columns to float64 BEFORE predict — MLflow signature enforcement
+    # declares on_vasopressors/on_ventilator as double and will not auto-cast booleans.
+    feature_frame = _coerce_feature_frame(training_pandas[_FEATURE_COLS])
+    predictions_df = model.predict(feature_frame)
     preds = [p for p in predictions_df["prediction"] if p is not None]
     scores: list[float] = parse_scores(preds)
 
@@ -261,7 +295,10 @@ def append_live_snapshot(
 
     # Score the census rows.
     # Filter out None/NaN prediction values before parsing (null-safe guard).
-    predictions_df = model.predict(census_pandas[_FEATURE_COLS])
+    # Coerce bool columns to float64 BEFORE predict — MLflow signature enforcement
+    # declares on_vasopressors/on_ventilator as double and will not auto-cast booleans.
+    feature_frame = _coerce_feature_frame(census_pandas[_FEATURE_COLS])
+    predictions_df = model.predict(feature_frame)
     preds = [p for p in predictions_df["prediction"] if p is not None]
     scores = parse_scores(preds)
 

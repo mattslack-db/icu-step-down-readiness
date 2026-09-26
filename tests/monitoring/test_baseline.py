@@ -14,7 +14,14 @@ import json
 
 import pytest
 
-from src.monitoring.baseline import _FEATURE_COLS, compute_decile_quantiles, parse_scores
+import pandas as pd
+
+from src.monitoring.baseline import (
+    _FEATURE_COLS,
+    _coerce_feature_frame,
+    compute_decile_quantiles,
+    parse_scores,
+)
 
 # ---------------------------------------------------------------------------
 # Guard: _FEATURE_COLS must stay in sync with src.ml.model.FEATURE_COLS
@@ -79,6 +86,66 @@ class TestFeatureColsGuard:
             "baseline._FEATURE_COLS diverged from src/ml/model.py:FEATURE_COLS. "
             "Update the mirror in baseline.py to match exactly."
         )
+
+
+# ---------------------------------------------------------------------------
+# _coerce_feature_frame
+# ---------------------------------------------------------------------------
+
+
+class TestCoerceFeatureFrame:
+    def test_bool_column_becomes_float64(self) -> None:
+        """A bool column in the input frame is cast to float64 in the result."""
+        df = pd.DataFrame({"on_vasopressors": [True, False, True], "score": [1.0, 2.0, 3.0]})
+        result = _coerce_feature_frame(df)
+        assert str(result["on_vasopressors"].dtype) == "float64"
+
+    def test_true_maps_to_1_and_false_maps_to_0(self) -> None:
+        """True → 1.0 and False → 0.0 after coercion."""
+        df = pd.DataFrame({"on_ventilator": [True, False]})
+        result = _coerce_feature_frame(df)
+        assert list(result["on_ventilator"]) == pytest.approx([1.0, 0.0])
+
+    def test_float_column_is_unchanged(self) -> None:
+        """A float64 column in the input frame is left unchanged in the result."""
+        df = pd.DataFrame({"on_vasopressors": [True, False], "lactate_last": [1.5, 2.5]})
+        result = _coerce_feature_frame(df)
+        assert str(result["lactate_last"].dtype) == "float64"
+        assert list(result["lactate_last"]) == pytest.approx([1.5, 2.5])
+
+    def test_input_frame_is_not_mutated(self) -> None:
+        """The original DataFrame must not be modified (immutability)."""
+        df = pd.DataFrame({"on_vasopressors": [True, False], "score": [0.1, 0.9]})
+        original_dtype = str(df["on_vasopressors"].dtype)
+        original_values = list(df["on_vasopressors"])
+        _coerce_feature_frame(df)
+        assert str(df["on_vasopressors"].dtype) == original_dtype
+        assert list(df["on_vasopressors"]) == original_values
+
+    def test_multiple_bool_columns_all_coerced(self) -> None:
+        """All bool columns in a mixed DataFrame are coerced to float64."""
+        df = pd.DataFrame({
+            "on_vasopressors": [True, False],
+            "on_ventilator": [False, True],
+            "hr_mean": [72.0, 85.0],
+        })
+        result = _coerce_feature_frame(df)
+        assert str(result["on_vasopressors"].dtype) == "float64"
+        assert str(result["on_ventilator"].dtype) == "float64"
+        assert str(result["hr_mean"].dtype) == "float64"
+
+    def test_no_bool_columns_returns_equivalent_frame(self) -> None:
+        """A frame with no bool columns is returned unchanged (values identical)."""
+        df = pd.DataFrame({"hr_mean": [70.0, 80.0], "age": [65.0, 72.0]})
+        result = _coerce_feature_frame(df)
+        assert list(result["hr_mean"]) == pytest.approx([70.0, 80.0])
+        assert list(result["age"]) == pytest.approx([65.0, 72.0])
+
+    def test_returns_new_dataframe_object(self) -> None:
+        """_coerce_feature_frame always returns a new DataFrame, not the input."""
+        df = pd.DataFrame({"on_vasopressors": [True], "score": [0.5]})
+        result = _coerce_feature_frame(df)
+        assert result is not df
 
 
 # ---------------------------------------------------------------------------
