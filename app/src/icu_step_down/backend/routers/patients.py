@@ -260,20 +260,18 @@ def get_patient(
         key=lambda f: float(f.get("magnitude", 0.0)),
         reverse=True,
     )
+    # M2: normalize ONCE; reuse for both response_factors and the care-plan / narrative bases
+    _normalized: list[tuple[str, str, float]] = [
+        normalize_factor(
+            f.get("name", ""),
+            f.get("direction", "risk"),
+            float(f.get("magnitude", 0.0)),
+        )
+        for f in raw_factors
+    ]
     response_factors: list[FactorOut] = [
-        FactorOut(
-            name=label,
-            direction=direction,
-            magnitude=magnitude,
-        )
-        for label, direction, magnitude in (
-            normalize_factor(
-                f.get("name", ""),
-                f.get("direction", "risk"),
-                float(f.get("magnitude", 0.0)),
-            )
-            for f in raw_factors
-        )
+        FactorOut(name=label, direction=direction, magnitude=magnitude)
+        for label, direction, magnitude in _normalized
     ]
 
     # --- 6b. Inject derived-flag guardrail risk factors ---
@@ -304,18 +302,20 @@ def get_patient(
             injected + response_factors,
             key=lambda f: f.magnitude,
             reverse=True,
-        )[:TOP_N_DISPLAY_FACTORS]
+        )
+
+    # M3: Apply TOP_N truncation unconditionally so response_factors is always
+    # capped at TOP_N_DISPLAY_FACTORS regardless of whether guardrails fired.
+    # Injected factors sort to the head via max+epsilon so they are retained.
+    response_factors = response_factors[:TOP_N_DISPLAY_FACTORS]
 
     # --- 7. Build deterministic care plan ---
-    normalized_factor_tuples = [
-        normalize_factor(
-            f.get("name", ""),
-            f.get("direction", "risk"),
-            float(f.get("magnitude", 0.0)),
-        )
-        for f in raw_factors
+    # M1: use final displayed factors (post-injection, post-truncation) so the
+    # care-plan basis reflects the same factor set shown in the UI.
+    final_factor_tuples: list[tuple[str, str, float]] = [
+        (f.name, f.direction, f.magnitude) for f in response_factors
     ]
-    care_plan_obj = build_care_plan(band, normalized_factor_tuples)
+    care_plan_obj = build_care_plan(band, final_factor_tuples)
     care_plan_out = CarePlanOut(
         next_check_in_hours=care_plan_obj.next_check_in_hours,
         monitoring=[
@@ -330,7 +330,12 @@ def get_patient(
     )
 
     # --- 8. Generate Gen AI narrative (with care plan for verbatim restatement) ---
-    narrative_factors = _build_narrative_factors(raw_factors)
+    # M1: build narrative factors from the final displayed response_factors so
+    # injected guardrail risks appear in the AI summary, not just the UI.
+    narrative_factors = [
+        Factor(name=f.name, direction=f.direction, magnitude=f.magnitude)
+        for f in response_factors
+    ]
     try:
         # Pass an index-derived representative score so the narrative band label
         # matches the displayed band (raw score clusters ~0.44–0.53 and is not

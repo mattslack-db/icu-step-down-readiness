@@ -300,3 +300,70 @@ def test_top_n_truncation_with_inject_risk_flag():
 
     # All entries have valid directions
     assert all(f.direction in ("risk", "supports") for f in detail.factors)
+
+
+# ---------------------------------------------------------------------------
+# Tests: M1 — injected risk labels reach build_narrative (M1 regression guard)
+# ---------------------------------------------------------------------------
+
+
+def test_injected_risk_factors_passed_to_build_narrative():
+    """
+    M1: When an inject_risk flag is set, the factors argument passed to
+    build_narrative must include the injected guardrail label.
+
+    Verifies that the narrative's factor list reflects the final displayed
+    factors (post-injection), not the raw pre-injection model output.
+    """
+    # Arrange: one model factor + active_bleeding flag set
+    row = _census_row("999005", active_bleeding=True)
+    ws = _make_ws(score=0.45, factors=[
+        {"name": "lactate_last", "direction": "risk", "magnitude": 0.26},
+    ])
+
+    captured_factors: list = []
+
+    def capture_narrative(score, factors, **kwargs):
+        captured_factors.extend(factors)
+        return "Stub narrative."
+
+    original_build = patients_mod.build_narrative
+    patients_mod.build_narrative = capture_narrative
+    try:
+        session = _make_session(row)
+        get_patient("999005", session, ws)
+    finally:
+        patients_mod.build_narrative = original_build
+
+    # Assert: injected guardrail label is present in captured factors
+    factor_names = [f.name for f in captured_factors]
+    assert "active bleeding / coagulopathy" in factor_names, (
+        f"Expected 'active bleeding / coagulopathy' in narrative factors, got: {factor_names}"
+    )
+
+
+# ---------------------------------------------------------------------------
+# Tests: M3 — unconditional TOP_N truncation (no-inject path)
+# ---------------------------------------------------------------------------
+
+
+def test_top_n_truncation_without_inject_risk_flag():
+    """
+    M3: Even when no guardrail fires, response_factors must be capped at
+    TOP_N_DISPLAY_FACTORS.  Ensures the truncation is applied unconditionally.
+    """
+    from icu_step_down.backend.routers.patients import TOP_N_DISPLAY_FACTORS
+
+    # Arrange: 7 model factors, no flags set
+    model_factors = [
+        {"name": f"feature_{i}", "direction": "risk", "magnitude": float(i) * 0.05}
+        for i in range(1, 8)
+    ]
+    row = _census_row("999006", active_bleeding=False, recent_extubation=False)
+    ws = _make_ws(score=0.55, factors=model_factors)
+
+    # Act
+    detail = _call_patient("999006", row, ws)
+
+    # Assert: capped regardless of injection path
+    assert len(detail.factors) == TOP_N_DISPLAY_FACTORS

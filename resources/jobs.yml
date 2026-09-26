@@ -11,9 +11,15 @@ resources:
       # Serverless compute (no cluster config needed)
       tasks:
         - task_key: drift_check
-          python_file: src/monitoring/drift_check.py
-          serverless: true
+          spark_python_task:
+            python_file: ../src/monitoring/drift_check.py
+          environment_key: drift_env
           timeout_seconds: 300
+      environments:
+        - environment_key: drift_env
+          spec:
+            client: "3"
+            dependencies: []
 
       schedule:
         quartz_cron_expression: "0 0 6 * * ?"   # 06:00 UTC daily
