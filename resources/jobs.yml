@@ -20,10 +20,11 @@ resources:
         timezone_id: UTC
         pause_status: UNPAUSED
 
-      # Notify on failure only (no spam on success)
-      email_notifications:
-        on_failure:
-          - "icu-ops-alerts@example.com"
+      # Notify on failure only (no spam on success).
+      # TODO: replace placeholder with the real ops-alerts DL before production.
+      # email_notifications:
+      #   on_failure:
+      #     - "icu-ops-alerts@example.com"
 
       # Retry once on transient failures (e.g. Lakebase connectivity)
       max_concurrent_runs: 1

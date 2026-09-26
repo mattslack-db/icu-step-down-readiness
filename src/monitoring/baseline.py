@@ -35,10 +35,11 @@ logger = logging.getLogger(__name__)
 # DDL strings (expressed here; executed at runtime by the controller)
 # ---------------------------------------------------------------------------
 
-_CATALOG = "${var.catalog}"  # Databricks bundle variable substitution
+_CATALOG = "icu_step_down"
+"""Unity Catalog name — single source of truth for this module."""
 
-BASELINE_TABLE = "gold.readiness_training_baseline"
-HISTORY_TABLE = "gold.readiness_score_history"
+BASELINE_TABLE = f"{_CATALOG}.gold.readiness_training_baseline"
+HISTORY_TABLE = f"{_CATALOG}.gold.readiness_score_history"
 
 BASELINE_TABLE_DDL = f"""
 CREATE TABLE IF NOT EXISTS {BASELINE_TABLE} (

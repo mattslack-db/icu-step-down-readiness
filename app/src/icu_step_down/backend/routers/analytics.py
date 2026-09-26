@@ -69,11 +69,21 @@ _ANALYTICS_SQL = text(
     + " FROM mimic_iii.census"
 )
 
-# Drift SQL: latest row from gold.readiness_drift (ordered by computed_at desc).
-_DRIFT_SQL = text(
-    "SELECT metric, value, verdict, n_live, model_version, "
+# Drift SQL: latest PSI row (carries verdict, n_live, model_version, computed_at).
+_DRIFT_PSI_SQL = text(
+    "SELECT value, verdict, n_live, model_version, "
     "CAST(computed_at AS VARCHAR) AS computed_at "
     "FROM gold.readiness_drift "
+    "WHERE metric = 'PSI' "
+    "ORDER BY computed_at DESC "
+    "LIMIT 1"
+)
+
+# Drift SQL: latest KS value (same run, joined by proximity).
+_DRIFT_KS_SQL = text(
+    "SELECT value "
+    "FROM gold.readiness_drift "
+    "WHERE metric = 'KS' "
     "ORDER BY computed_at DESC "
     "LIMIT 1"
 )
@@ -199,27 +209,40 @@ def get_analytics(
 
 def _fetch_drift_status(session: Any) -> DriftStatus | None:
     """
-    Query the latest row from gold.readiness_drift.
+    Query the latest PSI and KS rows from gold.readiness_drift.
 
     Returns None on any error (table not yet created, empty, etc.) so the
     analytics endpoint degrades gracefully when the drift job hasn't run yet.
+    KS falls back to None if the KS row is absent (older data or partial write).
     """
     try:
-        result = session.execute(_DRIFT_SQL)
-        row = result.fetchone()
-        if row is None:
+        # --- PSI row (carries verdict, n_live, model_version, computed_at) ---
+        psi_result = session.execute(_DRIFT_PSI_SQL)
+        psi_row = psi_result.fetchone()
+        if psi_row is None:
             return None
-        keys = list(result.keys()) if hasattr(result, "keys") else [
-            "metric", "value", "verdict", "n_live", "model_version", "computed_at"
+        psi_keys = list(psi_result.keys()) if hasattr(psi_result, "keys") else [
+            "value", "verdict", "n_live", "model_version", "computed_at"
         ]
-        data = dict(zip(keys, row))
+        psi_data = dict(zip(psi_keys, psi_row))
+
+        # --- KS row (optional — graceful fallback to None if absent) ---------
+        ks_value: float | None = None
+        try:
+            ks_result = session.execute(_DRIFT_KS_SQL)
+            ks_row = ks_result.fetchone()
+            if ks_row is not None:
+                ks_value = float(ks_row[0])
+        except Exception:
+            pass  # KS row absent — leave as None
+
         return DriftStatus(
-            psi=float(data.get("value", 0.0)),
-            ks=0.0,  # KS stored separately; PSI is the primary metric in this table
-            verdict=str(data.get("verdict", "insufficient")),
-            n_live=int(data.get("n_live", 0)),
-            model_version=str(data.get("model_version", "")),
-            computed_at=str(data.get("computed_at", "")),
+            psi=float(psi_data.get("value", 0.0)),
+            ks=ks_value,
+            verdict=str(psi_data.get("verdict", "insufficient")),
+            n_live=int(psi_data.get("n_live", 0)),
+            model_version=str(psi_data.get("model_version", "")),
+            computed_at=str(psi_data.get("computed_at", "")),
         )
     except Exception as exc:
         logger.info(

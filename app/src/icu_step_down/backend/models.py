@@ -191,8 +191,9 @@ class DriftStatus(BaseModel):
     psi: float
     """Population Stability Index — ~0 for stable, >0.25 indicates drift."""
 
-    ks: float
-    """Kolmogorov-Smirnov statistic — max CDF gap between baseline and live."""
+    ks: float | None = None
+    """Kolmogorov-Smirnov statistic — max CDF gap between baseline and live.
+    None when the KS row has not yet been written (graceful degradation)."""
 
     verdict: str
     """One of: 'insufficient', 'stable', 'moderate', 'drift'."""

@@ -179,7 +179,9 @@ function DriftMonitorTile({ drift }: { drift: DriftStatus | null | undefined }) 
           </div>
           <div className="border rounded-lg p-3 text-center">
             <p className="text-xs text-muted-foreground">KS</p>
-            <p className="text-2xl font-bold">{drift.ks.toFixed(3)}</p>
+            <p className="text-2xl font-bold">
+              {drift.ks != null ? drift.ks.toFixed(3) : "—"}
+            </p>
             <p className="text-xs text-muted-foreground">Max CDF gap</p>
           </div>
           <div className="border rounded-lg p-3 text-center">

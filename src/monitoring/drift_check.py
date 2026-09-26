@@ -281,9 +281,12 @@ def run_drift_check(
 # Default Databricks I/O helpers (used only in the live job, not in tests)
 # ---------------------------------------------------------------------------
 
-_BASELINE_TABLE = "gold.readiness_training_baseline"
-_HISTORY_TABLE = "gold.readiness_score_history"
-_DRIFT_TABLE = "gold.readiness_drift"
+_CATALOG = "icu_step_down"
+"""Unity Catalog name — single source of truth for this module."""
+
+_BASELINE_TABLE = f"{_CATALOG}.gold.readiness_training_baseline"
+_HISTORY_TABLE = f"{_CATALOG}.gold.readiness_score_history"
+_DRIFT_TABLE = f"{_CATALOG}.gold.readiness_drift"
 
 # DDL for gold.readiness_drift (created by the job on first run if absent).
 _DRIFT_TABLE_DDL = f"""
@@ -338,16 +341,16 @@ def _get_served_model_version() -> str:  # pragma: no cover
 
 
 def _databricks_drift_writer(result: dict[str, Any]) -> None:  # pragma: no cover
-    """Append a drift row to gold.readiness_drift."""
+    """Append PSI and KS rows to gold.readiness_drift."""
     from databricks.sdk.runtime import spark  # type: ignore[import-not-found]
 
     spark.sql(_DRIFT_TABLE_DDL)
     spark.sql(
-        f"INSERT INTO {_DRIFT_TABLE} VALUES ("
-        f"'PSI', {result['psi']}, '{result['verdict']}', "
-        f"{result['n_live']}, '{result['model_version']}', "
-        f"current_timestamp()"
-        f")"
+        f"INSERT INTO {_DRIFT_TABLE} VALUES "
+        f"('PSI', {result['psi']}, '{result['verdict']}', "
+        f"{result['n_live']}, '{result['model_version']}', current_timestamp()), "
+        f"('KS',  {result['ks']},  '{result['verdict']}', "
+        f"{result['n_live']}, '{result['model_version']}', current_timestamp())"
     )
 
 

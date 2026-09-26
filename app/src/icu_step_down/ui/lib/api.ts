@@ -15,8 +15,9 @@ export class ApiError extends Error {
 export interface DriftStatus {
     /** Population Stability Index — ~0 for stable, >0.25 indicates drift. */
     psi: number;
-    /** Kolmogorov-Smirnov statistic — max CDF gap between baseline and live. */
-    ks: number;
+    /** Kolmogorov-Smirnov statistic — max CDF gap between baseline and live.
+     *  null when the KS row has not yet been written (graceful degradation). */
+    ks: number | null;
     /** One of: 'insufficient', 'stable', 'moderate', 'drift'. */
     verdict: string;
     /** Number of live scores used in this drift check. */

@@ -215,3 +215,52 @@ def test_run_drift_check_happy_path_returns_verdict() -> None:
     assert "n_live" in result
     assert result["n_live"] == 50
     assert result["verdict"] in {"stable", "moderate", "drift", "insufficient"}
+
+
+# ---------------------------------------------------------------------------
+# Writer emits BOTH a PSI row and a KS row with correct values (I-1 fix)
+# ---------------------------------------------------------------------------
+
+
+def test_writer_receives_both_psi_and_ks_values() -> None:
+    """
+    The injected writer must receive a result dict containing both 'psi' and
+    'ks' with non-trivial values so that the caller can persist both metrics.
+    """
+    # Arrange
+    base_scores = [0.4 + i * 0.001 for i in range(100)]
+    live_scores = [0.42 + i * 0.001 for i in range(60)]
+
+    written: list[dict] = []
+
+    def capturing_writer(result: dict) -> None:
+        written.append(result)
+
+    # Act
+    run_drift_check(
+        baseline_reader=lambda: {"scores": base_scores, "model_version": "2"},
+        live_reader=lambda: live_scores,
+        served_version="2",
+        writer=capturing_writer,
+    )
+
+    # Assert — writer called exactly once with a single result dict
+    assert len(written) == 1
+    result = written[0]
+
+    # Both metrics must be present and finite
+    assert "psi" in result, "result dict missing 'psi'"
+    assert "ks" in result, "result dict missing 'ks'"
+    assert isinstance(result["psi"], float), f"psi is not float: {result['psi']!r}"
+    assert isinstance(result["ks"], float), f"ks is not float: {result['ks']!r}"
+
+    # PSI and KS must be non-negative and in plausible range for a small shift
+    assert result["psi"] >= 0.0, f"PSI should be non-negative, got {result['psi']}"
+    assert 0.0 <= result["ks"] <= 1.0, f"KS should be in [0,1], got {result['ks']}"
+
+    # For a slight shift (~0.02 offset), both values should be small but > 0
+    assert result["psi"] > 0.0, "Expected non-zero PSI for shifted distribution"
+    assert result["ks"] > 0.0, "Expected non-zero KS for shifted distribution"
+
+    # n_live must reflect the live sample
+    assert result["n_live"] == len(live_scores)
