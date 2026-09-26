@@ -11,6 +11,7 @@ Run from repo root:
 from __future__ import annotations
 
 import json
+import re
 
 import pytest
 
@@ -21,7 +22,39 @@ from src.monitoring.baseline import (
     _coerce_feature_frame,
     compute_decile_quantiles,
     parse_scores,
+    HISTORY_TABLE_DDL,
 )
+
+# ---------------------------------------------------------------------------
+# HISTORY_TABLE_DDL — schema guard
+# ---------------------------------------------------------------------------
+
+
+class TestHistoryTableDDL:
+    def test_no_expression_partitioning(self) -> None:
+        """
+        Delta rejects PARTITIONED BY on SQL expressions (e.g. DATE(...)).
+        The DDL must contain no PARTITIONED BY clause at all.
+        """
+        assert "PARTITIONED BY" not in HISTORY_TABLE_DDL.upper(), (
+            "HISTORY_TABLE_DDL must not use PARTITIONED BY — Delta rejects "
+            "expression-based partition keys. Remove the clause or use a "
+            "plain physical column."
+        )
+
+    def test_no_date_function_in_partitioned_by(self) -> None:
+        """
+        Specifically guard against the DATE(...) expression that triggered
+        [DELTA_OPERATION_NOT_ALLOWED] in production.
+        """
+        # Case-insensitive search for the offending pattern
+        assert not re.search(
+            r"PARTITIONED\s+BY\s*\(\s*DATE\s*\(", HISTORY_TABLE_DDL, re.IGNORECASE
+        ), (
+            "HISTORY_TABLE_DDL contains 'PARTITIONED BY (DATE(...))' which Delta "
+            "rejects. Remove the expression partition."
+        )
+
 
 # ---------------------------------------------------------------------------
 # Guard: _FEATURE_COLS must stay in sync with src.ml.model.FEATURE_COLS

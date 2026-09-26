@@ -75,7 +75,6 @@ CREATE TABLE IF NOT EXISTS {HISTORY_TABLE} (
     captured_at     TIMESTAMP   NOT NULL
 )
 USING DELTA
-PARTITIONED BY (DATE(captured_at))
 """
 
 # ---------------------------------------------------------------------------
