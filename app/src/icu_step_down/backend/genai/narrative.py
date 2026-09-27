@@ -21,7 +21,10 @@ Usage::
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Callable, Optional
+from typing import TYPE_CHECKING, Callable, Optional
+
+if TYPE_CHECKING:
+    from ..lib.care_plan import CarePlan
 
 # ---------------------------------------------------------------------------
 # Data model
@@ -85,15 +88,23 @@ _SYSTEM_PROMPT = (
     " provided."
     " Do not assert a numeric probability or percentage likelihood."
     " Write in clear, clinical prose."
+    " If a care plan is provided, restate its next check-in time and monitoring"
+    " thresholds verbatim — do not invent new intervals, thresholds, or values."
 )
 
 
-def _build_prompt(score: float, factors: list[Factor]) -> str:
+def _build_prompt(
+    score: float,
+    factors: list[Factor],
+    care_plan: "Optional[CarePlan]" = None,
+) -> str:
     """
-    Assemble the user-turn prompt from score and factors.
+    Assemble the user-turn prompt from score, factors, and optional care plan.
 
     Factors are sorted descending by magnitude so the most influential
-    features appear first.
+    features appear first.  When a care_plan is provided its next-check-in
+    interval and monitoring thresholds are appended verbatim so the FM
+    restates them rather than inventing new clinical values.
     """
     sorted_factors = sorted(factors, key=lambda f: f.magnitude, reverse=True)
     band = readiness_band(score)
@@ -103,12 +114,24 @@ def _build_prompt(score: float, factors: list[Factor]) -> str:
         for f in sorted_factors
     )
 
-    return (
+    prompt = (
         f"Readiness band: {band}\n"
         f"Readiness score (ranking signal, not a calibrated probability): {score:.3f}\n"
         f"Clinical factors (sorted highest-magnitude first):\n{factor_lines}\n\n"
         "Write the clinical readiness summary now."
     )
+
+    if care_plan is not None:
+        lines = "\n".join(
+            f"  - monitor {m.parameter}: {m.threshold} ({m.rationale})"
+            for m in care_plan.monitoring
+        )
+        prompt += (
+            f"\n\nCare plan (restate, do not alter):\n"
+            f"  - next check-in: {care_plan.next_check_in_hours}h\n{lines}"
+        )
+
+    return prompt
 
 
 # ---------------------------------------------------------------------------
@@ -183,6 +206,7 @@ def build_narrative(
     score: float,
     factors: list[Factor],
     *,
+    care_plan: "Optional[CarePlan]" = None,
     client: Optional[Callable[[str], str]] = None,
 ) -> str:
     """
@@ -214,5 +238,5 @@ def build_narrative(
     if client is None:
         client = _make_real_client()
 
-    prompt = _build_prompt(score, factors)
+    prompt = _build_prompt(score, factors, care_plan=care_plan)
     return client(prompt)

@@ -27,7 +27,7 @@
   "data_sources": {
     "tables": [
       {
-        "identifier": "icu_step_down.gold.census",
+        "identifier": "icu_step_down.gold.census_governed",
         "description": ["Current ICU patient census with 40 active patients. Use this table for questions about 'current', 'today', or 'active' ICU patients. Key booleans: on_vasopressors, on_ventilator. los = length of stay in days (string). gcs_last = Glasgow Coma Scale total 3-15. icustay_id joins to readiness_training_set for outcome labels."],
         "column_configs": [
           {
@@ -217,7 +217,7 @@
       {
         "id": "b0000000000000000000000000000001",
         "question": ["How many current ICU patients are ready for step-down?"],
-        "sql": ["SELECT SUM(CASE WHEN r.readiness_label = 1 THEN 1 ELSE 0 END) AS ready_for_step_down, SUM(CASE WHEN r.readiness_label = 0 THEN 1 ELSE 0 END) AS not_ready, COUNT(*) AS total_current_patients FROM icu_step_down.gold.census c INNER JOIN icu_step_down.gold.readiness_training_set r ON c.icustay_id = r.icustay_id"]
+        "sql": ["SELECT SUM(CASE WHEN r.readiness_label = 1 THEN 1 ELSE 0 END) AS ready_for_step_down, SUM(CASE WHEN r.readiness_label = 0 THEN 1 ELSE 0 END) AS not_ready, COUNT(*) AS total_current_patients FROM icu_step_down.gold.census_governed c INNER JOIN icu_step_down.gold.readiness_training_set r ON c.icustay_id = r.icustay_id"]
       },
       {
         "id": "b0000000000000000000000000000002",
@@ -227,7 +227,7 @@
       {
         "id": "b0000000000000000000000000000003",
         "question": ["How many current patients are on vasopressors and on a ventilator at the same time?"],
-        "sql": ["SELECT SUM(CASE WHEN c.on_vasopressors AND c.on_ventilator THEN 1 ELSE 0 END) AS on_both, SUM(CASE WHEN c.on_vasopressors THEN 1 ELSE 0 END) AS on_vasopressors_only, SUM(CASE WHEN c.on_ventilator THEN 1 ELSE 0 END) AS on_ventilator_only, COUNT(*) AS total_patients FROM icu_step_down.gold.census c"]
+        "sql": ["SELECT SUM(CASE WHEN c.on_vasopressors AND c.on_ventilator THEN 1 ELSE 0 END) AS on_both, SUM(CASE WHEN c.on_vasopressors THEN 1 ELSE 0 END) AS on_vasopressors_only, SUM(CASE WHEN c.on_ventilator THEN 1 ELSE 0 END) AS on_ventilator_only, COUNT(*) AS total_patients FROM icu_step_down.gold.census_governed c"]
       },
       {
         "id": "b0000000000000000000000000000004",

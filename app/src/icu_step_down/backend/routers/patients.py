@@ -23,9 +23,11 @@ from sqlmodel import text
 
 from ..core.dependencies import Dependencies
 from ..genai.narrative import Factor, build_narrative
+from ..lib.care_plan import build_care_plan
 from ..lib.feature_labels import normalize_factor
+from ..lib.guardrails import GUARDRAILS
 from ..lib.readiness import compute_readiness_index, readiness_band_from_index
-from ..models import FactorOut, PatientDetail, PatientFeatures, VitalPoint
+from ..models import CarePlanOut, FactorOut, MonitoringItemOut, PatientDetail, PatientFeatures, VitalPoint
 from .census import (
     FEATURE_COLS,
     _build_record,
@@ -47,6 +49,8 @@ router = APIRouter(prefix="/api", tags=["patients"])
 _DETAIL_EXTRA_COLS = [
     "icustay_id", "subject_id", "los", "age",
     "on_vasopressors", "on_ventilator",
+    # Derived guardrail flags (Phase 2) — used to inject risk factors
+    "recent_extubation", "active_bleeding",
     "hr_mean", "sbp_mean", "dbp_mean", "spo2_mean", "spo2_min",
     "temp_c_mean", "rr_mean", "gcs_last", "lactate_last",
 ]
@@ -80,6 +84,15 @@ _CENSUS_BATCH_SQL = text(
 # ---------------------------------------------------------------------------
 # Helper
 # ---------------------------------------------------------------------------
+
+# Maximum factors returned in the patient detail response, matching the model's
+# own TOP_N_FACTORS cap.  Guardrail injection can add up to len(inject_risk
+# guardrails) factors; truncating here keeps the list at a predictable size.
+TOP_N_DISPLAY_FACTORS: int = 5
+
+# Small epsilon added to the max existing magnitude when injecting a guardrail
+# factor, ensuring it sorts to the top of the list.
+_INJECT_EPSILON: float = 1e-4
 
 _LACTATE_NOTE = (
     "Lactate is the dominant model feature. When lactate is *measured*, "
@@ -128,8 +141,10 @@ def get_patient(
        endpoint for the whole census in one shot.
     4. Key predictions by icustay_id — never by row position.
     5. Compute relative readiness index from the full census score distribution.
-    6. Generate Gen AI clinical narrative (LLaMA-3.3-70B).
-    7. Return assembled PatientDetail.
+    6. Build response factors (sorted by magnitude, direction-corrected).
+    7. Build deterministic care plan (next check-in + monitoring thresholds).
+    8. Generate Gen AI clinical narrative (LLaMA-3.3-70B) with care plan.
+    9. Return assembled PatientDetail.
 
     All DB and serving errors surface as explicit HTTP errors; none are swallowed.
     """
@@ -245,24 +260,82 @@ def get_patient(
         key=lambda f: float(f.get("magnitude", 0.0)),
         reverse=True,
     )
+    # M2: normalize ONCE; reuse for both response_factors and the care-plan / narrative bases
+    _normalized: list[tuple[str, str, float]] = [
+        normalize_factor(
+            f.get("name", ""),
+            f.get("direction", "risk"),
+            float(f.get("magnitude", 0.0)),
+        )
+        for f in raw_factors
+    ]
     response_factors: list[FactorOut] = [
-        FactorOut(
-            name=label,
-            direction=direction,
-            magnitude=magnitude,
-        )
-        for label, direction, magnitude in (
-            normalize_factor(
-                f.get("name", ""),
-                f.get("direction", "risk"),
-                float(f.get("magnitude", 0.0)),
-            )
-            for f in raw_factors
-        )
+        FactorOut(name=label, direction=direction, magnitude=magnitude)
+        for label, direction, magnitude in _normalized
     ]
 
-    # --- 7. Generate Gen AI narrative ---
-    narrative_factors = _build_narrative_factors(raw_factors)
+    # --- 6b. Inject derived-flag guardrail risk factors ---
+    # For each inject_risk guardrail, if the census row has the flag set and the
+    # label is not already present, insert a synthetic risk factor at the top of
+    # the list (magnitude = max existing + epsilon).  Dedup is label-based so a
+    # model factor carrying the same label is never double-counted.
+    existing_labels: set[str] = {f.name for f in response_factors}
+    max_magnitude: float = max(
+        (f.magnitude for f in response_factors), default=0.0
+    )
+    injected: list[FactorOut] = []
+    for g in GUARDRAILS:
+        if g.kind != "inject_risk":
+            continue
+        if not _to_bool(row.get(g.feature, False)):
+            continue
+        if g.label in existing_labels:
+            continue
+        injected.append(FactorOut(
+            name=g.label,
+            direction="risk",
+            magnitude=max_magnitude + _INJECT_EPSILON,
+        ))
+        existing_labels.add(g.label)
+    if injected:
+        response_factors = sorted(
+            injected + response_factors,
+            key=lambda f: f.magnitude,
+            reverse=True,
+        )
+
+    # M3: Apply TOP_N truncation unconditionally so response_factors is always
+    # capped at TOP_N_DISPLAY_FACTORS regardless of whether guardrails fired.
+    # Injected factors sort to the head via max+epsilon so they are retained.
+    response_factors = response_factors[:TOP_N_DISPLAY_FACTORS]
+
+    # --- 7. Build deterministic care plan ---
+    # M1: use final displayed factors (post-injection, post-truncation) so the
+    # care-plan basis reflects the same factor set shown in the UI.
+    final_factor_tuples: list[tuple[str, str, float]] = [
+        (f.name, f.direction, f.magnitude) for f in response_factors
+    ]
+    care_plan_obj = build_care_plan(band, final_factor_tuples)
+    care_plan_out = CarePlanOut(
+        next_check_in_hours=care_plan_obj.next_check_in_hours,
+        monitoring=[
+            MonitoringItemOut(
+                parameter=m.parameter,
+                threshold=m.threshold,
+                rationale=m.rationale,
+            )
+            for m in care_plan_obj.monitoring
+        ],
+        basis=care_plan_obj.basis,
+    )
+
+    # --- 8. Generate Gen AI narrative (with care plan for verbatim restatement) ---
+    # M1: build narrative factors from the final displayed response_factors so
+    # injected guardrail risks appear in the AI summary, not just the UI.
+    narrative_factors = [
+        Factor(name=f.name, direction=f.direction, magnitude=f.magnitude)
+        for f in response_factors
+    ]
     try:
         # Pass an index-derived representative score so the narrative band label
         # matches the displayed band (raw score clusters ~0.44–0.53 and is not
@@ -272,7 +345,11 @@ def get_patient(
             "Borderline": 0.60,
             "Not ready": 0.20,
         }.get(band, patient_score)
-        narrative = build_narrative(_band_score_hint, narrative_factors)
+        narrative = build_narrative(
+            _band_score_hint,
+            narrative_factors,
+            care_plan=care_plan_obj,
+        )
     except Exception as exc:
         logger.warning("Gen AI narrative generation failed: %s", exc)
         narrative = f"Clinical narrative unavailable ({exc}). Readiness band: {band}."
@@ -283,7 +360,7 @@ def get_patient(
         _LACTATE_NOTE if "lactate_last" in raw_factor_names else None
     )
 
-    # --- 8. Assemble and return ---
+    # --- 9. Assemble and return ---
     features = PatientFeatures(
         icustay_id=str(row["icustay_id"]),
         subject_id=str(row["subject_id"]),
@@ -311,4 +388,5 @@ def get_patient(
         factors=response_factors,
         narrative=narrative,
         lactate_note=lactate_note,
+        care_plan=care_plan_out,
     )

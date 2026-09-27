@@ -1,0 +1,37 @@
+# Derived clinical-guardrail signals — gold.patient_features
+# Captured: 2026-09-26T18:58:03Z | profile: icu-sandbox | pipeline update: 9a13de6a-18a1-4ac4-99ab-6c871dff2ecc
+# recent_extubation: vent support earlier in stay, none in final 24h window.
+# active_bleeding: Hb drop >=2 g/dL OR INR>1.5 OR platelets<50k (silver.lab_events).
+
+## Prevalence across all ICU stays (n=61,532)
+[
+  {
+    "active_bleeding": "false",
+    "n": "39278",
+    "recent_extubation": "false"
+  },
+  {
+    "active_bleeding": "true",
+    "n": "8002",
+    "recent_extubation": "false"
+  },
+  {
+    "active_bleeding": "false",
+    "n": "12171",
+    "recent_extubation": "true"
+  },
+  {
+    "active_bleeding": "true",
+    "n": "2081",
+    "recent_extubation": "true"
+  }
+]
+
+## Current census prevalence (n=40) — columns inherited via SELECT pf.*
+[
+  {
+    "active_bleeding": "9",
+    "recently_extubated": "7",
+    "total": "40"
+  }
+]

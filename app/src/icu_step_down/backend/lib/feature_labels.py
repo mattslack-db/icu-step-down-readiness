@@ -8,6 +8,8 @@ correct SHAP direction for known binary risk features.
 
 from __future__ import annotations
 
+from .guardrails import GUARDRAILS, apply_direction_override  # noqa: F401 (re-exported)
+
 # ---------------------------------------------------------------------------
 # Human-readable clinical labels for all 30 model feature columns.
 # ---------------------------------------------------------------------------
@@ -48,14 +50,12 @@ FEATURE_LABELS: dict[str, str] = {
 # ---------------------------------------------------------------------------
 # Features where the clinical direction is always RISK, regardless of SHAP sign.
 #
-# Being on vasopressors or a ventilator indicates haemodynamic/respiratory
-# instability and never supports step-down readiness.  When the SHAP value
-# is positive for these features (e.g. because the model learned a correlation
-# artefact) we override the direction to "risk" to avoid misleading clinicians.
+# Derived from the GUARDRAILS registry (override_risk kind) — kept as a
+# frozenset alias for back-compatibility with code that imports it directly.
 # ---------------------------------------------------------------------------
 
 ALWAYS_RISK_FEATURES: frozenset[str] = frozenset(
-    {"on_vasopressors", "on_ventilator"}
+    g.feature for g in GUARDRAILS if g.kind == "override_risk"
 )
 
 
@@ -68,6 +68,10 @@ def normalize_factor(
     Map a raw model feature name to a human-readable label and enforce
     clinically correct direction.
 
+    Direction is delegated to ``apply_direction_override`` from the declarative
+    guardrail registry so that new override rules require only a registry entry,
+    not a code change here.
+
     Args:
         raw_name:  Raw feature column name (e.g. ``"on_vasopressors"``).
         direction: SHAP-derived direction (``"supports"`` | ``"risk"``).
@@ -77,6 +81,5 @@ def normalize_factor(
         Tuple of (human_label, corrected_direction, magnitude).
     """
     label = FEATURE_LABELS.get(raw_name, raw_name.replace("_", " "))
-    if raw_name in ALWAYS_RISK_FEATURES:
-        direction = "risk"
+    direction = apply_direction_override(raw_name, direction)
     return label, direction, magnitude

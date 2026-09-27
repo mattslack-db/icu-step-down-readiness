@@ -1,0 +1,36 @@
+resources:
+  jobs:
+    icu_readiness_drift_check:
+      name: icu-readiness-drift-check
+      description: >
+        Daily PSI/KS drift check — compares the readiness-score training
+        baseline against the last 24h of live scores and writes results to
+        gold.readiness_drift.  Raises on empty baseline or model-version
+        mismatch (fail-loud guard).
+
+      # Serverless compute (no cluster config needed)
+      tasks:
+        - task_key: drift_check
+          spark_python_task:
+            python_file: ../src/monitoring/drift_check.py
+          environment_key: drift_env
+          timeout_seconds: 300
+      environments:
+        - environment_key: drift_env
+          spec:
+            client: "3"
+            dependencies: []
+
+      schedule:
+        quartz_cron_expression: "0 0 6 * * ?"   # 06:00 UTC daily
+        timezone_id: UTC
+        pause_status: UNPAUSED
+
+      # Notify on failure only (no spam on success).
+      # TODO: replace placeholder with the real ops-alerts DL before production.
+      # email_notifications:
+      #   on_failure:
+      #     - "icu-ops-alerts@example.com"
+
+      # Retry once on transient failures (e.g. Lakebase connectivity)
+      max_concurrent_runs: 1

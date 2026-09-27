@@ -1,0 +1,28 @@
+# Feature 4 — model drift check, live run
+# Captured: 2026-09-26T21:57:14Z | profile: icu-sandbox | drift job 403607105257379 run 200504116046604 (SUCCESS)
+
+## Baseline + history (scored via UC model readiness_model/2)
+[
+  {
+    "baseline_quantile_rows": "11",
+    "history_rows": "40"
+  }
+]
+
+## readiness_drift (PSI + KS vs training baseline)
+[
+  {
+    "metric": "KS",
+    "model_version": "2",
+    "n_live": "40",
+    "value": "0.2205",
+    "verdict": "drift"
+  },
+  {
+    "metric": "PSI",
+    "model_version": "2",
+    "n_live": "40",
+    "value": "2.1528",
+    "verdict": "drift"
+  }
+]

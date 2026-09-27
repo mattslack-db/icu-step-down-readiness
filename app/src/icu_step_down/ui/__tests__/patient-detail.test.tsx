@@ -39,6 +39,17 @@ const MOCK_DETAIL: PatientDetail = {
   readiness_score: 0.8,
   narrative: "This patient demonstrates stable haemodynamics and improving ventilatory status, supporting consideration for step-down transfer.",
   lactate_note: null,
+  care_plan: {
+    next_check_in_hours: 12,
+    monitoring: [
+      {
+        parameter: "lactate",
+        threshold: "recheck in 6h; escalate if >2.0 mmol/L",
+        rationale: "elevated/last lactate is a top driver",
+      },
+    ],
+    basis: "band=Ready; 3 factors considered",
+  },
   factors: [
     { direction: "supports", magnitude: 0.3, name: "Normal SpO2" },
     { direction: "supports", magnitude: 0.2, name: "Stable heart rate" },
@@ -74,6 +85,17 @@ const MOCK_NOT_READY: PatientDetail = {
   readiness_index: 20,
   readiness_score: 0.3,
   narrative: "Ongoing vasopressor support and ventilator dependence preclude step-down transfer at this time.",
+  care_plan: {
+    next_check_in_hours: 4,
+    monitoring: [
+      {
+        parameter: "vitals",
+        threshold: "reassess full vital set at next check-in",
+        rationale: "insufficient factor signal — clinician review required",
+      },
+    ],
+    basis: "band=Not ready; 2 factors considered",
+  },
   factors: [
     { direction: "risk", magnitude: 0.5, name: "On vasopressors" },
     { direction: "risk", magnitude: 0.4, name: "Ventilator dependent" },
@@ -174,6 +196,28 @@ describe("PatientDetailContent — patient detail view", () => {
     renderDetail(MOCK_NOT_READY);
     // "On Vasopressors" appears as a badge and may also appear in recommendations
     expect(screen.getAllByText(/on vasopressors/i).length).toBeGreaterThan(0);
+  });
+
+  it("renders the care plan block with next check-in hours after switching to Recommendations tab", async () => {
+    const user = userEvent.setup();
+    renderDetail();
+    const actionsTab = screen.getByRole("tab", { name: /recommendations/i });
+    await user.click(actionsTab);
+    // Care plan block should be present
+    const carePlanBlock = screen.getByTestId("care-plan-block");
+    expect(carePlanBlock).toBeInTheDocument();
+    // Next check-in time from the mock care plan (12h for Ready band)
+    expect(carePlanBlock).toHaveTextContent("12h");
+  });
+
+  it("renders monitoring thresholds in the care plan block", async () => {
+    const user = userEvent.setup();
+    renderDetail();
+    const actionsTab = screen.getByRole("tab", { name: /recommendations/i });
+    await user.click(actionsTab);
+    const carePlanBlock = screen.getByTestId("care-plan-block");
+    expect(carePlanBlock).toHaveTextContent("lactate");
+    expect(carePlanBlock).toHaveTextContent(">2.0");
   });
 });
 

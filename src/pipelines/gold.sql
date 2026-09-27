@@ -160,6 +160,113 @@ lactate AS (
   WHERE is_lactate = TRUE
     AND valuenum IS NOT NULL
   QUALIFY ROW_NUMBER() OVER (PARTITION BY hadm_id ORDER BY charttime DESC) = 1
+),
+
+-- ==========================================================================
+-- Derived signal: recent_extubation
+--
+-- TRUE when the stay had ventilator support at any point (on_ventilator = TRUE)
+-- but no ventilator event is active or charted within the final 24-hour window.
+-- This represents a "vent-off transition" — the patient was extubated within the
+-- last 24 h and is now breathing independently, carrying post-extubation risk.
+--
+-- Source: same itemids as on_ventilator (path a + path b below).
+--   Path a — MetaVision procedure_events_mv:
+--     225792 Invasive Ventilation, 225794 Non-Invasive Ventilation, 224385 Intubation
+--   Path b — CareVue / MetaVision chart_events:
+--     720 CareVue Ventilator Mode, 722 CareVue Ventilator Type,
+--     223849 MetaVision Ventilator Mode
+--
+-- For procedure_events_mv we check event overlap with the window:
+--   STARTTIME < window_end AND (ENDTIME IS NULL OR ENDTIME > window_start)
+-- For chart_events we check CHARTTIME falls within the window.
+-- ==========================================================================
+ventilator_in_window_mv AS (
+  SELECT DISTINCT pem.ICUSTAY_ID AS icustay_id
+  FROM icu_step_down.bronze.procedure_events_mv pem
+  JOIN stay_windows sw ON sw.icustay_id = pem.ICUSTAY_ID
+  WHERE pem.ITEMID IN (225792, 225794, 224385)
+    AND pem.ICUSTAY_ID IS NOT NULL
+    -- Event overlaps 24h window: started before window ends AND
+    -- ended after window starts (ongoing events have ENDTIME = NULL)
+    AND pem.STARTTIME  < sw.window_end
+    AND (pem.ENDTIME IS NULL OR pem.ENDTIME > sw.window_start)
+),
+ventilator_in_window_chart AS (
+  SELECT DISTINCT ce.ICUSTAY_ID AS icustay_id
+  FROM icu_step_down.bronze.chart_events ce
+  JOIN stay_windows sw ON sw.icustay_id = ce.ICUSTAY_ID
+  WHERE ce.ITEMID IN (720, 722, 223849)
+    AND ce.ICUSTAY_ID IS NOT NULL
+    AND ce.CHARTTIME >= sw.window_start
+    AND ce.CHARTTIME <  sw.window_end
+),
+ventilator_in_window AS (
+  SELECT icustay_id FROM ventilator_in_window_mv
+  UNION
+  SELECT icustay_id FROM ventilator_in_window_chart
+),
+
+-- ==========================================================================
+-- Derived signal: active_bleeding
+--
+-- TRUE when any of the following coagulopathy / haemorrhage proxies fire in
+-- the final 24-hour window:
+--
+--   (a) Haemoglobin drop ≥2 g/dL from first to last reading in the window.
+--       Threshold: ≥2 g/dL — standard clinical definition of acute significant
+--       blood loss (aligned with transfusion trigger literature).
+--       Itemids (verified against d_labitems and silver.lab_events row counts):
+--         50811 — Hemoglobin (blood gas panel)   : 89,712 rows
+--         51222 — Hemoglobin (CBC)               : 752,277 rows
+--       Physiological range filter: 1–25 g/dL to exclude artefact.
+--
+--   (b) INR > 1.5 (coagulopathy proxy).
+--       Threshold: 1.5 — standard critical-care coagulopathy cut-off.
+--       Itemid 51237 — INR(PT): 470,853 rows.
+--
+--   (c) Platelet count < 50k/μL (thrombocytopenic bleeding risk).
+--       Threshold: 50k — critical-care transfusion trigger per standard guidelines.
+--       Itemid 51265 — Platelet Count: 778,163 rows.
+--
+-- Join key: hadm_id (silver.lab_events lacks icustay_id; consistent with lactate CTE).
+-- ==========================================================================
+
+-- Haemoglobin first and last readings in the 24h window per admission
+hb_ranked AS (
+  SELECT
+    le.hadm_id,
+    le.valuenum,
+    ROW_NUMBER() OVER (PARTITION BY le.hadm_id ORDER BY le.charttime ASC)  AS rn_asc,
+    ROW_NUMBER() OVER (PARTITION BY le.hadm_id ORDER BY le.charttime DESC) AS rn_desc
+  FROM icu_step_down.silver.lab_events le
+  JOIN stay_windows sw ON sw.hadm_id = le.hadm_id
+  WHERE le.itemid IN (50811, 51222)          -- blood-gas Hb + CBC Hb
+    AND le.charttime >= sw.window_start
+    AND le.charttime <  sw.window_end
+    AND le.valuenum BETWEEN 1 AND 25         -- physiological range (g/dL)
+),
+hb_window AS (
+  SELECT
+    hadm_id,
+    MAX(CASE WHEN rn_asc  = 1 THEN valuenum END) AS hb_first,
+    MAX(CASE WHEN rn_desc = 1 THEN valuenum END) AS hb_last
+  FROM hb_ranked
+  GROUP BY hadm_id
+),
+
+-- Coagulopathy: any INR > 1.5 or platelets < 50k in the 24h window
+coag_window AS (
+  SELECT DISTINCT le.hadm_id
+  FROM icu_step_down.silver.lab_events le
+  JOIN stay_windows sw ON sw.hadm_id = le.hadm_id
+  WHERE le.charttime >= sw.window_start
+    AND le.charttime <  sw.window_end
+    AND le.valuenum IS NOT NULL
+    AND (
+      (le.itemid = 51237 AND le.valuenum > 1.5)    -- INR > 1.5
+      OR (le.itemid = 51265 AND le.valuenum < 50)  -- Platelets < 50k/μL
+    )
 )
 
 SELECT
@@ -184,7 +291,31 @@ SELECT
   (vp.icustay_id IS NOT NULL) AS on_vasopressors,
   (vt.icustay_id IS NOT NULL) AS on_ventilator,
   -- Lactate
-  lac.lactate_last
+  lac.lactate_last,
+  -- -----------------------------------------------------------------------
+  -- Derived guardrail signals (Phase 2)
+  -- -----------------------------------------------------------------------
+  -- recent_extubation: had vent support in stay but none in final 24h window
+  --   → vent-off transition within 24h carries post-extubation reintubation risk
+  (vt.icustay_id IS NOT NULL AND viw.icustay_id IS NULL) AS recent_extubation,
+  -- active_bleeding: Hb drop ≥2 g/dL in window OR coagulopathy (INR>1.5 / plt<50k)
+  (
+    (hbw.hb_first IS NOT NULL AND hbw.hb_last IS NOT NULL
+     AND (hbw.hb_first - hbw.hb_last) >= 2.0)
+    OR cw.hadm_id IS NOT NULL
+  ) AS active_bleeding,
+  -- -----------------------------------------------------------------------
+  -- Synthetic care-unit dimension (Phase 3)
+  -- Deterministic assignment from icustay_id modulo 3 so the value is
+  -- stable across pipeline re-runs.
+  -- NOTE: care_unit is a synthetic demo dimension over de-identified data;
+  -- it does NOT reflect the patient's actual physical care unit in MIMIC-III.
+  -- -----------------------------------------------------------------------
+  CASE pmod(CAST(sw.icustay_id AS BIGINT), 3)
+    WHEN 0 THEN 'MICU'
+    WHEN 1 THEN 'SICU'
+    ELSE        'CCU'
+  END AS care_unit
 FROM stay_windows sw
 JOIN icu_step_down.silver.patients p
   ON p.subject_id = sw.subject_id
@@ -195,7 +326,13 @@ LEFT JOIN vasopressors vp
 LEFT JOIN ventilator vt
   ON vt.icustay_id = sw.icustay_id
 LEFT JOIN lactate lac
-  ON lac.hadm_id = sw.hadm_id;
+  ON lac.hadm_id = sw.hadm_id
+LEFT JOIN ventilator_in_window viw
+  ON viw.icustay_id = sw.icustay_id
+LEFT JOIN hb_window hbw
+  ON hbw.hadm_id = sw.hadm_id
+LEFT JOIN coag_window cw
+  ON cw.hadm_id = sw.hadm_id;
 
 -- ---------------------------------------------------------------------------
 -- gold.readiness_training_set
@@ -269,6 +406,7 @@ WITH recent_stays_with_vitals AS (
   ORDER BY s.intime DESC
   LIMIT 40
 )
+-- care_unit propagates automatically because census is SELECT pf.* from patient_features.
 SELECT pf.*
 FROM icu_step_down.gold.patient_features pf
 JOIN recent_stays_with_vitals rs

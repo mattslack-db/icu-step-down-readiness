@@ -29,6 +29,7 @@ from ..lib.readiness import compute_readiness_index, readiness_band_from_index
 from ..models import (
     AnalyticsResponse,
     BandCount,
+    DriftStatus,
     FeatureImportanceItem,
 )
 from .census import (
@@ -66,6 +67,30 @@ _ANALYTICS_SQL = text(
     'SELECT "icustay_id", '
     + ", ".join(f'"{c}"' for c in FEATURE_COLS)
     + " FROM mimic_iii.census"
+)
+
+# Drift SQL: latest PSI row from the Lakebase-synced copy.
+# FIX I2: gold.readiness_drift is a UC Delta table; the app's Lakebase
+# (Postgres) session only exposes the mimic_iii schema. Querying
+# gold.readiness_drift directly from the Postgres session would always fail
+# because the 'gold' schema does not exist in Postgres.  The synced table
+# mimic_iii.readiness_drift (SNAPSHOT mode, PK=metric) is the correct target.
+_DRIFT_PSI_SQL = text(
+    "SELECT value, verdict, n_live, model_version, "
+    "CAST(computed_at AS VARCHAR) AS computed_at "
+    "FROM mimic_iii.readiness_drift "
+    "WHERE metric = 'PSI' "
+    "ORDER BY computed_at DESC "
+    "LIMIT 1"
+)
+
+# Drift SQL: latest KS value from the Lakebase-synced copy.
+_DRIFT_KS_SQL = text(
+    "SELECT value "
+    "FROM mimic_iii.readiness_drift "
+    "WHERE metric = 'KS' "
+    "ORDER BY computed_at DESC "
+    "LIMIT 1"
 )
 
 
@@ -107,6 +132,9 @@ def get_analytics(
             detail=f"Failed to query Lakebase for analytics: {exc}",
         ) from exc
 
+    # --- 1b. Fetch latest drift status (graceful degradation) ---
+    drift_status: DriftStatus | None = _fetch_drift_status(session)
+
     if not rows:
         return AnalyticsResponse(
             total_census=0,
@@ -116,6 +144,7 @@ def get_analytics(
             vent_rate=0.0,
             vasopressor_rate=0.0,
             generated_at=datetime.now(timezone.utc).isoformat(),
+            drift_status=drift_status,
         )
 
     # --- 2. Batch-call serving ---
@@ -179,7 +208,52 @@ def get_analytics(
         vent_rate=vent_rate,
         vasopressor_rate=vasopressor_rate,
         generated_at=datetime.now(timezone.utc).isoformat(),
+        drift_status=drift_status,
     )
+
+
+def _fetch_drift_status(session: Any) -> DriftStatus | None:
+    """
+    Query the latest PSI and KS rows from gold.readiness_drift.
+
+    Returns None on any error (table not yet created, empty, etc.) so the
+    analytics endpoint degrades gracefully when the drift job hasn't run yet.
+    KS falls back to None if the KS row is absent (older data or partial write).
+    """
+    try:
+        # --- PSI row (carries verdict, n_live, model_version, computed_at) ---
+        psi_result = session.execute(_DRIFT_PSI_SQL)
+        psi_row = psi_result.fetchone()
+        if psi_row is None:
+            return None
+        psi_keys = list(psi_result.keys()) if hasattr(psi_result, "keys") else [
+            "value", "verdict", "n_live", "model_version", "computed_at"
+        ]
+        psi_data = dict(zip(psi_keys, psi_row))
+
+        # --- KS row (optional — graceful fallback to None if absent) ---------
+        ks_value: float | None = None
+        try:
+            ks_result = session.execute(_DRIFT_KS_SQL)
+            ks_row = ks_result.fetchone()
+            if ks_row is not None:
+                ks_value = float(ks_row[0])
+        except Exception:
+            pass  # KS row absent — leave as None
+
+        return DriftStatus(
+            psi=float(psi_data.get("value", 0.0)),
+            ks=ks_value,
+            verdict=str(psi_data.get("verdict", "insufficient")),
+            n_live=int(psi_data.get("n_live", 0)),
+            model_version=str(psi_data.get("model_version", "")),
+            computed_at=str(psi_data.get("computed_at", "")),
+        )
+    except Exception as exc:
+        logger.info(
+            "Drift table not yet available (graceful degradation): %s", exc
+        )
+        return None
 
 
 def _feature_importance_items() -> list[FeatureImportanceItem]:

@@ -12,9 +12,26 @@ export class ApiError extends Error {
         this.body = body;
     }
 }
+export interface DriftStatus {
+    /** Population Stability Index — ~0 for stable, >0.25 indicates drift. */
+    psi: number;
+    /** Kolmogorov-Smirnov statistic — max CDF gap between baseline and live.
+     *  null when the KS row has not yet been written (graceful degradation). */
+    ks: number | null;
+    /** One of: 'insufficient', 'stable', 'moderate', 'drift'. */
+    verdict: string;
+    /** Number of live scores used in this drift check. */
+    n_live: number;
+    /** Model version the baseline was computed against. */
+    model_version: string;
+    /** ISO-8601 UTC timestamp of the drift check run. */
+    computed_at: string;
+}
 export interface AnalyticsResponse {
     avg_los_by_band: Record<string, number>;
     band_distribution: BandCount[];
+    /** Drift-check result — null when the drift job has not yet run. */
+    drift_status?: DriftStatus | null;
     feature_importance: FeatureImportanceItem[];
     generated_at: string;
     total_census: number;
@@ -25,6 +42,11 @@ export interface BandCount {
     band: string;
     count: number;
     pct: number;
+}
+export interface CarePlanOut {
+    basis: string;
+    monitoring: MonitoringItemOut[];
+    next_check_in_hours: number;
 }
 export interface CensusPatient {
     age: number;
@@ -62,12 +84,18 @@ export interface FeatureImportanceItem {
 export interface HTTPValidationError {
     detail?: ValidationError[];
 }
+export interface MonitoringItemOut {
+    parameter: string;
+    rationale: string;
+    threshold: string;
+}
 export interface Name {
     family_name?: string | null;
     given_name?: string | null;
 }
 export interface PatientDetail {
     band: string;
+    care_plan: CarePlanOut;
     factors: FactorOut[];
     features: PatientFeatures;
     lactate_note: string | null;

@@ -3,13 +3,13 @@ import { createFileRoute } from "@tanstack/react-router";
 import { QueryErrorResetBoundary } from "@tanstack/react-query";
 import { ErrorBoundary } from "react-error-boundary";
 import { useGetAnalyticsSuspense } from "@/lib/api";
-import type { AnalyticsResponse } from "@/lib/api";
+import type { AnalyticsResponse, DriftStatus } from "@/lib/api";
 import selector from "@/lib/selector";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Progress } from "@/components/ui/progress";
-import { Loader2, AlertTriangle } from "lucide-react";
+import { Loader2, AlertTriangle, Activity } from "lucide-react";
 
 // ─── Feature Importance Chart ─────────────────────────────────────────────
 function FeatureImportanceChart({
@@ -88,6 +88,122 @@ function BandDistributionChart({
         );
       })}
     </div>
+  );
+}
+
+// ─── Drift Monitor Tile ───────────────────────────────────────────────────
+const VERDICT_CONFIG: Record<
+  string,
+  { label: string; colorClass: string; textClass: string; desc: string }
+> = {
+  stable: {
+    label: "Stable",
+    colorClass: "border-green-500/30",
+    textClass: "text-green-600 dark:text-green-400",
+    desc: "Score distribution is consistent with training (PSI < 0.10).",
+  },
+  moderate: {
+    label: "Moderate shift",
+    colorClass: "border-yellow-500/30",
+    textClass: "text-yellow-600 dark:text-yellow-400",
+    desc: "Score distribution has drifted moderately (0.10 ≤ PSI < 0.25). Monitor closely.",
+  },
+  drift: {
+    label: "Drift detected",
+    colorClass: "border-red-500/40",
+    textClass: "text-red-600 dark:text-red-400",
+    desc: "Significant score drift detected (PSI ≥ 0.25). Consider retraining.",
+  },
+  insufficient: {
+    label: "Insufficient data",
+    colorClass: "border-muted",
+    textClass: "text-muted-foreground",
+    desc: "Not enough live scores to assess drift reliably.",
+  },
+};
+
+function DriftMonitorTile({ drift }: { drift: DriftStatus | null | undefined }) {
+  if (!drift) {
+    return (
+      <Card className="border-dashed">
+        <CardHeader className="pb-2 pt-4">
+          <div className="flex items-start gap-2">
+            <Activity className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
+            <CardTitle className="text-sm font-medium">
+              Model Drift Monitor
+            </CardTitle>
+          </div>
+        </CardHeader>
+        <CardContent className="pb-4">
+          <p className="text-xs text-muted-foreground">
+            No drift data yet — the daily drift-check job has not run.
+            Once the job runs, PSI and KS statistics will appear here as the
+            next step toward stronger discrimination.
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const config =
+    VERDICT_CONFIG[drift.verdict] ?? VERDICT_CONFIG["insufficient"];
+
+  return (
+    <Card className={config.colorClass}>
+      <CardHeader className="pb-2 pt-4">
+        <div className="flex items-start gap-2">
+          <Activity className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
+          <CardTitle className="text-sm font-medium">
+            Model Drift Monitor
+          </CardTitle>
+        </div>
+      </CardHeader>
+      <CardContent className="pb-4 space-y-3">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div className="border rounded-lg p-3 text-center">
+            <p className="text-xs text-muted-foreground">Verdict</p>
+            <p className={`text-lg font-bold ${config.textClass}`}>
+              {config.label}
+            </p>
+          </div>
+          <div className="border rounded-lg p-3 text-center">
+            <p className="text-xs text-muted-foreground">PSI</p>
+            <p className="text-2xl font-bold">{drift.psi.toFixed(3)}</p>
+            <p className="text-xs text-muted-foreground">
+              {drift.psi < 0.10
+                ? "< 0.10 stable"
+                : drift.psi < 0.25
+                  ? "0.10–0.25 moderate"
+                  : "≥ 0.25 drift"}
+            </p>
+          </div>
+          <div className="border rounded-lg p-3 text-center">
+            <p className="text-xs text-muted-foreground">KS</p>
+            <p className="text-2xl font-bold">
+              {drift.ks != null ? drift.ks.toFixed(3) : "—"}
+            </p>
+            <p className="text-xs text-muted-foreground">Max CDF gap</p>
+          </div>
+          <div className="border rounded-lg p-3 text-center">
+            <p className="text-xs text-muted-foreground">Live scores</p>
+            <p className="text-2xl font-bold">{drift.n_live}</p>
+            <p className="text-xs text-muted-foreground">Last 24 h</p>
+          </div>
+        </div>
+        <div className="text-xs text-muted-foreground space-y-1 border-t pt-3">
+          <p>{config.desc}</p>
+          <p>
+            Model v{drift.model_version} &middot; Checked at{" "}
+            {new Date(drift.computed_at).toLocaleString()}
+          </p>
+          <p className="font-medium text-foreground/60">
+            PSI/KS monitoring is a step toward stronger discrimination and
+            earlier detection of distribution shift. Thresholds: PSI &lt; 0.10
+            stable &middot; &lt; 0.25 moderate &middot; ≥ 0.25 drift.
+          </p>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -269,6 +385,9 @@ function AnalyticsContent() {
           <FeatureImportanceChart items={data.feature_importance} />
         </CardContent>
       </Card>
+
+      {/* Drift Monitor */}
+      <DriftMonitorTile drift={data.drift_status} />
 
       <p className="text-xs text-muted-foreground text-center pb-4">
         MIMIC-III de-identified research data &middot; Model v2 &middot;
