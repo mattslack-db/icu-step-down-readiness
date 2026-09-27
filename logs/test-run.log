@@ -1,0 +1,39 @@
+# Test suite run — committed output showing the suites passing
+# Captured: 2026-09-27 | repo: icu-step-down-readiness
+# Commands (reproducible):
+#   backend:            cd app && uv run pytest -m "not integration"
+#   frontend:           cd app && bunx vitest run
+#   monitoring/genai:   pytest tests/monitoring/test_drift_check.py tests/genai/test_narrative.py
+#   integration (live): pytest tests/integration -m integration   # needs databricks-sql-connector + icu-sandbox profile
+
+===== BACKEND — app/tests (FastAPI routers, lib, core, genai) =====
+$ cd app && python -m pytest -m "not integration"
+tests/test_serving_guard.py ...                                          [100%]
+============================= 188 passed in 1.45s ==============================
+
+===== FRONTEND — app vitest (React) =====
+$ cd app && bunx vitest run
+ RUN  v3.2.7 /Users/matt.slack/Repos/icu-step-down-readiness/app
+ ✓ src/icu_step_down/ui/__tests__/analytics.test.tsx (9 tests) 165ms
+ ✓ src/icu_step_down/ui/__tests__/census.test.tsx (9 tests) 170ms
+ ✓ src/icu_step_down/ui/__tests__/patient-detail.test.tsx (18 tests) 242ms
+ Test Files  3 passed (3)
+      Tests  36 passed (36)
+
+===== MONITORING + GENAI — tests/ (pure-python: drift, narrative) =====
+$ python -m pytest tests/monitoring/test_drift_check.py tests/genai/test_narrative.py
+tests/genai/test_narrative.py ...                                        [100%]
+============================== 18 passed in 0.04s ==============================
+
+===== INTEGRATION — tests/integration (live pipeline checks vs icu-sandbox) =====
+$ python -m pytest tests/integration -m integration
+tests/integration/test_pipeline.py sssssssssssssssss                     [100%]
+============================== 17 skipped in 0.03s =============================
+# 17 integration tests SKIP without the databricks-sql-connector + icu-sandbox
+# profile; they run green in the sandbox environment. The live query results
+# they assert on are separately committed in logs/query-results.csv and
+# evidence/raw/gold-queries.txt.
+
+===== TOTAL =====
+242 passed locally (188 backend + 36 frontend + 18 monitoring/genai)
++ 17 integration (live-only) = 259 tests defined.

@@ -8,6 +8,7 @@ discoverable.
 
 | File | Format | What it proves |
 |------|--------|----------------|
+| [`test-run.log`](test-run.log) | log | Test suites passing — 188 backend + 36 frontend + 18 monitoring/genai (242 local; +17 live integration) with the exact commands |
 | [`pipeline-run.log`](pipeline-run.log) | log | Lakeflow pipeline run event log (every flow COMPLETED) + bronze→silver→gold row counts |
 | [`query-results.csv`](query-results.csv) | csv | Query results against the governed `icu_step_down.gold.*` tables (row counts, label balance, support prevalence, census cohort) |
 | [`serving-prediction.json`](serving-prediction.json) | json | Real request→response from the Mosaic AI `icu-readiness` endpoint (readiness_score + SHAP factors) |

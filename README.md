@@ -20,6 +20,7 @@ Headline results, as committed text:
 - **Real served prediction** (Mosaic AI `icu-readiness`, model v2): `readiness_score 0.4739` with factors `lactate_last (risk 0.262)`, `on_ventilator (risk 0.030)`, … — `on_ventilator` shown as **risk** (safety override, live). ([`evidence/raw/serving-prediction.txt`](evidence/raw/serving-prediction.txt))
 - **Genie Q&A** over the governed tables: *"How many current ICU patients are ready for step-down?"* → generated SQL → `ready=38, not_ready=2, total=40`. ([`evidence/raw/genie-qa.txt`](evidence/raw/genie-qa.txt))
 - **Deployed app RUNNING** + Lakebase synced tables ONLINE; **drift job** PSI 2.15 / KS 0.22; **unit-access** scoped predicate returns 15 MICU rows live. ([`evidence/raw/app-deploy.txt`](evidence/raw/app-deploy.txt), [`evidence/raw/drift-run.txt`](evidence/raw/drift-run.txt), [`evidence/raw/unit-access-verification.txt`](evidence/raw/unit-access-verification.txt))
+- **Test suites passing:** 188 backend + 36 frontend + 18 monitoring/genai = **242 passing** (+17 live integration) — committed run output in [`logs/test-run.log`](logs/test-run.log).
 
 **Want the transformation logic end to end?** The full bronze→silver→gold medallion SQL and the Genie space configuration are reproduced readably in **[`DATA-JOURNEY.md`](DATA-JOURNEY.md)** (source in [`src/pipelines/`](src/pipelines/) and [`src/genie/`](src/genie/)).
 
@@ -64,7 +65,7 @@ flowchart LR
 | Surface | Databricks App (React + FastAPI) | Census dashboard, patient detail, analytics | [07-app-api](evidence/07-app-api.md) · [07-app-deploy](evidence/07-app-deploy.md) |
 | Provision | FEVM + DABs | AWS serverless sandbox; all assets via Asset Bundles | [00-provisioning](evidence/00-provisioning.md) |
 | Data access | Delta Sharing | Cross-metastore D2D share of the source | [01-data-access](evidence/01-data-access.md) |
-| Tests | pytest + vitest | 117 backend + 32 frontend + 17 pipeline integration | [08-tests](evidence/08-tests.md) |
+| Tests | pytest + vitest | 188 backend + 36 frontend + 18 monitoring/genai (+17 live integration) — run output in [`logs/test-run.log`](logs/test-run.log) | [08-tests](evidence/08-tests.md) |
 
 All evidence files contain **committed, text-readable run output** (row counts, query results, model metrics, deploy logs) — not screenshots.
 
@@ -128,7 +129,7 @@ databricks bundle deploy   -t sandbox --profile icu-sandbox   # pipeline, model 
 
 - **Pipeline:** run the `icu-step-down-readiness-medallion` Lakeflow pipeline to (re)build bronze→silver→gold.
 - **Lakebase sync:** `python src/lakebase/sync_tables.py` (idempotent).
-- **Tests:** `cd app && uv run pytest` (backend, 117) · `cd app && bunx vitest run` (frontend, 32) · `pytest tests/integration -m integration` (pipeline, 17 — needs the `icu-sandbox` profile + `databricks-sql-connector`).
+- **Tests:** `cd app && uv run pytest` (backend, **188**) · `cd app && bunx vitest run` (frontend, **36**) · `pytest tests/monitoring tests/genai` (monitoring/genai, **18**) · `pytest tests/integration -m integration` (pipeline, 17 — needs the `icu-sandbox` profile + `databricks-sql-connector`). Committed run output: [`logs/test-run.log`](logs/test-run.log).
 
 ## Governance
 

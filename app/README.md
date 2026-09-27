@@ -18,6 +18,7 @@ Full output: top-level [`../logs/`](../logs/) (`.log` / `.csv` / `.json` / `.md`
 - **Served prediction** (Mosaic AI `icu-readiness`, model v2): `readiness_score 0.4739`, factors `lactate_last (risk 0.262)`, `on_ventilator (risk 0.030)` — ventilator forced to **risk** (safety override, live).
 - **Genie Q&A**: *"How many current ICU patients are ready for step-down?"* → generated SQL → `ready=38, not_ready=2, total=40`.
 - **App RUNNING** at the deployed URL; Lakebase synced tables ONLINE; drift job PSI 2.15 / KS 0.22; unit-access scoped predicate → 15 MICU rows live.
+- **Test suites passing**: 188 backend + 36 frontend + 18 monitoring/genai = 242 (+17 live integration) — committed output in [`../logs/test-run.log`](../logs/test-run.log).
 
 ## 🔬 Data journey & Genie config (readable transformation logic)
 
