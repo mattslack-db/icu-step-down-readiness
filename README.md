@@ -8,6 +8,19 @@ An end-to-end Databricks data journey that helps ICU clinicians identify which p
 
 ---
 
+## ✅ Proof this build actually ran (readable execution evidence)
+
+Full readable run output is committed at **[`EVIDENCE.md`](EVIDENCE.md)** and, raw, in
+**[`evidence/raw/`](evidence/raw/)**. Headline results, as committed text:
+
+- **Lakeflow pipeline run — COMPLETED**, bronze→gold row counts: bronze `admissions 58,976` / `chart_events 38,776,289` / `lab_events 27,854,055` → gold `patient_features 61,532`, `readiness_training_set 61,532`, `census 40`. ([`evidence/raw/pipeline-run.txt`](evidence/raw/pipeline-run.txt))
+- **Query against governed gold tables:** census cohort n=40, avg LOS 2.83d, 8 on pressors / 11 on vent; training label balance 59,706 ready / 1,826 not-ready. ([`evidence/raw/gold-queries.txt`](evidence/raw/gold-queries.txt))
+- **Real served prediction** (Mosaic AI `icu-readiness`, model v2): `readiness_score 0.4739` with factors `lactate_last (risk 0.262)`, `on_ventilator (risk 0.030)`, … — `on_ventilator` shown as **risk** (safety override, live). ([`evidence/raw/serving-prediction.txt`](evidence/raw/serving-prediction.txt))
+- **Genie Q&A** over the governed tables: *"How many current ICU patients are ready for step-down?"* → generated SQL → `ready=38, not_ready=2, total=40`. ([`evidence/raw/genie-qa.txt`](evidence/raw/genie-qa.txt))
+- **Deployed app RUNNING** + Lakebase synced tables ONLINE; **drift job** PSI 2.15 / KS 0.22; **unit-access** scoped predicate returns 15 MICU rows live. ([`evidence/raw/app-deploy.txt`](evidence/raw/app-deploy.txt), [`evidence/raw/drift-run.txt`](evidence/raw/drift-run.txt), [`evidence/raw/unit-access-verification.txt`](evidence/raw/unit-access-verification.txt))
+
+---
+
 ## The business problem
 
 ICUs run at 70–90% occupancy; a single blocked bed can delay a critical admission. Step-down decisions today are manual, subjective, and vary by provider and shift, so clinicians tend to hold patients longer than necessary "to be safe."
