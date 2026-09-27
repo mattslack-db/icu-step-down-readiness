@@ -93,6 +93,10 @@ def care_units_from_me(me: Any) -> list[str] | None:
 
     Duck-typed on purpose (reads ``.groups`` / ``.display``) so it is unit-
     testable without constructing SDK objects.
+
+    LIMITATION: ``current_user.me()`` reports only DIRECT group memberships, so a
+    user who holds an icu_* group transitively via a parent (nested) group is not
+    matched here and would be denied. Assign the icu_* groups to users directly.
     """
     raw_groups = getattr(me, "groups", None) or []
     groups = [g.display for g in raw_groups if getattr(g, "display", None)]

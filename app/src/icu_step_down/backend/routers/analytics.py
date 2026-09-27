@@ -123,13 +123,14 @@ def get_analytics(
     4. Return aggregates (no individual patient rows).
     """
     # --- 0. Fail-closed deny: user in no recognised care-unit group ---
-    # Empty aggregates (HTTP 200) mirror the empty-census path so the UI renders
-    # its normal empty state; a denied user never receives patient-derived stats.
+    # Fully empty payload (HTTP 200) so the UI renders its normal empty state.
+    # feature_importance is withheld too: a denied user receives nothing derived
+    # from the model or the census (consistent with the deny intent).
     if access.scope_denies_all(care_unit_scope):
         return AnalyticsResponse(
             total_census=0,
             band_distribution=[],
-            feature_importance=_feature_importance_items(),
+            feature_importance=[],
             avg_los_by_band={},
             vent_rate=0.0,
             vasopressor_rate=0.0,

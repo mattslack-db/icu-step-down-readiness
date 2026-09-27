@@ -104,6 +104,15 @@ _VITALS_SQL = text(
 # Batch census query: include icustay_id so predictions can be keyed by id.
 # Base SELECT; the same care_unit filter is appended so the readiness index is
 # computed within exactly the cohort the user is allowed to see.
+#
+# DESIGN TRADE-OFF (deliberate): scoping this cohort makes the readiness index
+# a percentile WITHIN the viewer's visible units, so a scoped nurse and an
+# icu_admin can see a different index/band for the same patient. This is chosen
+# over a whole-census index because the alternative requires reading the very
+# rows the user is denied (other units) to compute their percentile, which would
+# defeat the access boundary. When enforcement is OFF (default) every viewer sees
+# the whole-census index, so there is no divergence. Revisit if a single stable
+# cross-unit index becomes a product requirement.
 _CENSUS_BATCH_SELECT = (
     'SELECT "icustay_id", '
     + ", ".join(f'"{c}"' for c in FEATURE_COLS)
