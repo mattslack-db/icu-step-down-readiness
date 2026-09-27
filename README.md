@@ -68,6 +68,7 @@ Clinical-enhancement evidence (captured 2026-09-26):
 - [`evidence/raw/care-unit-distribution.txt`](evidence/raw/care-unit-distribution.txt) — synthetic `care_unit` (MICU/SICU/CCU) distribution over census and full cohort
 - [`evidence/raw/drift-run.txt`](evidence/raw/drift-run.txt) — live drift job run: PSI 2.15 / KS 0.22 (verdict `drift`) vs the training baseline
 - [`evidence/raw/drift-baseline.txt`](evidence/raw/drift-baseline.txt) — training-cohort score-decile baseline the drift check compares against
+- [`evidence/raw/unit-access-verification.txt`](evidence/raw/unit-access-verification.txt) — live read-only proof of the unit-access mechanism (captured 2026-09-27): group resolution via `current_user.me()`, `care_unit` on gold + the Lakebase read path, the scoped predicate, and the fail-closed governed view
 
 See [`evidence/raw/README.md`](evidence/raw/README.md) for the capture method and how to reproduce.
 

@@ -28,6 +28,7 @@ Clinical-enhancement evidence (captured 2026-09-26):
 | [`care-unit-distribution.txt`](care-unit-distribution.txt) | Gold (governance) | Synthetic `care_unit` (MICU/SICU/CCU) distribution over census and full cohort — the dimension the row filter and app scope enforce on |
 | [`drift-run.txt`](drift-run.txt) | Monitoring | Live drift job (SUCCESS): PSI 2.1528 / KS 0.2205 (verdict `drift`, n_live 40) vs training baseline, scored via UC model `readiness_model/2` |
 | [`drift-baseline.txt`](drift-baseline.txt) | Monitoring | Training-cohort score-decile baseline the drift check compares live scores against |
+| [`unit-access-verification.txt`](unit-access-verification.txt) | Governance | Live read-only proof of the app-side unit-access mechanism (captured 2026-09-27): `current_user.me()` group resolution, `care_unit` on gold + Lakebase `mimic_iii.census`, the scoped `WHERE care_unit IN (...)` predicate, and the fail-closed `is_member` governed view |
 
 ## How to reproduce
 

@@ -1,0 +1,60 @@
+# Unit-level access enforcement — live mechanism verification
+# Captured: 2026-09-27T14:12:33Z | profile: icu-sandbox | workspace: fe-sandbox-icu-step-down-readiness
+# Read-only verification of the app-side care-unit access path (feat: enforce
+# fail-closed unit-level access). No production change: enforce_unit_access
+# stayed OFF; this proves the data/query mechanism the enforcement relies on.
+# Caller: matt.slack@databricks.com — member of icu_micu, NOT icu_admins, so the
+# expected resolved scope is ["MICU"] (the fail-closed, non-admin case).
+
+## 1. current_user.me() group resolution (the source of the app's scope)
+# databricks current-user me --profile icu-sandbox
+user:   matt.slack@databricks.com
+groups: ['admins', 'icu_micu', 'users']
+# → care_unit_filter_for_user(groups) maps this to ["MICU"] (icu_admins absent;
+#   'admins' is the workspace-admin group, NOT icu_admins). Direct membership
+#   resolves correctly, consistent with the documented direct-membership caveat.
+
+## 2. care_unit dimension on the governed UC gold table
+# databricks experimental aitools tools query
+#   "SELECT care_unit, COUNT(*) AS n FROM icu_step_down.gold.census GROUP BY care_unit ORDER BY care_unit"
+[
+  { "care_unit": "CCU",  "n": "15" },
+  { "care_unit": "MICU", "n": "15" },
+  { "care_unit": "SICU", "n": "10" }
+]
+
+## 3. Scoped predicate the enforcement issues, run against gold.census
+# SELECT COUNT(*) AS micu_rows FROM icu_step_down.gold.census WHERE care_unit IN ('MICU')
+[
+  { "micu_rows": "15" }
+]
+
+## 4. UC governed view — fail-closed is_member() scoping, live
+# SELECT care_unit, COUNT(*) AS n FROM icu_step_down.gold.census_governed GROUP BY care_unit ORDER BY care_unit
+# Caller is in icu_micu (not icu_admins) → view returns MICU rows only:
+[
+  { "care_unit": "MICU", "n": "15" }
+]
+
+## 5. Lakebase Postgres copy — the app's ACTUAL read path (mimic_iii.census)
+# Connected via psycopg to the Lakebase production endpoint
+# (projects/icu-step-down/branches/production/endpoints/primary) with an OAuth
+# database credential; queried the synced Postgres table directly.
+enhancement columns present: schema 'mimic_iii' → active_bleeding, care_unit, recent_extubation
+care_unit distribution:      [('CCU', 15), ('MICU', 15), ('SICU', 10)]
+scoped WHERE "care_unit" IN ('MICU') → 15 rows
+
+## Conclusion
+# The enforcement mechanism is verified live end-to-end on the data/query path:
+#  - the icu_* workspace groups exist and resolve via current_user.me();
+#  - care_unit (and recent_extubation / active_bleeding) are present on both the
+#    governed UC gold.census AND the Lakebase mimic_iii.census the app reads;
+#  - the scoped `WHERE care_unit IN (...)` predicate returns exactly the caller's
+#    unit subset (15 MICU rows) on both layers;
+#  - the UC row filter (is_member) is fail-closed and scopes a non-admin
+#    icu_micu member to MICU only.
+# Not exercised (no production change): flipping enforce_unit_access ON in the
+# deployed app and the resulting HTTP 404-deny / 503-undetermined responses,
+# which remain covered by the app unit-test suite (188 tests).
+# NOTE for operators: to see all units, a user AND the app service principal
+# must be DIRECT members of icu_admins ('admins' != 'icu_admins').
