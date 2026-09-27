@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from typing import TypeAlias
+
+from ._access import CareUnitScopeDependency
 from ._defaults import ConfigDependency, ClientDependency, UserWorkspaceClientDependency
 from ._headers import HeadersDependency
 from .lakebase import LakebaseDependency
@@ -29,3 +31,7 @@ class Dependencies:
     """Lakebase session dependency.
     Recommended usage: `session: Dependencies.Session`"""
 
+    CareUnitScope: TypeAlias = CareUnitScopeDependency
+    """Requesting user's care-unit access scope (fail-closed).
+    None = unrestricted, list[str] = allowed units, [] = deny-all.
+    Recommended usage: `care_unit_scope: Dependencies.CareUnitScope`"""

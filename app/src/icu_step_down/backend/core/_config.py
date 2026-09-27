@@ -29,6 +29,17 @@ class AppConfig(BaseSettings):
     )
     app_name: str = Field(default=app_name)
 
+    enforce_unit_access: bool = Field(
+        default=False,
+        description=(
+            "When True, scope census/patient/analytics reads to the requesting "
+            "user's icu_* care-unit groups (fail-closed). Requires the OBO "
+            "X-Forwarded-Access-Token header. Defaults False so the deployment's "
+            "behaviour is unchanged until an operator enables and verifies it. "
+            "Env: <APP_SLUG>_ENFORCE_UNIT_ACCESS."
+        ),
+    )
+
     @property
     def static_assets_path(self) -> Path:
         return Path(str(resources.files(app_slug))).joinpath("__dist__")

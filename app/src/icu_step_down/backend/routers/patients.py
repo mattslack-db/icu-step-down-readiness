@@ -23,11 +23,19 @@ from sqlmodel import text
 
 from ..core.dependencies import Dependencies
 from ..genai.narrative import Factor, build_narrative
+from ..lib import access
 from ..lib.care_plan import build_care_plan
 from ..lib.feature_labels import normalize_factor
 from ..lib.guardrails import GUARDRAILS
 from ..lib.readiness import compute_readiness_index, readiness_band_from_index
-from ..models import CarePlanOut, FactorOut, MonitoringItemOut, PatientDetail, PatientFeatures, VitalPoint
+from ..models import (
+    CarePlanOut,
+    FactorOut,
+    MonitoringItemOut,
+    PatientDetail,
+    PatientFeatures,
+    VitalPoint,
+)
 from .census import (
     FEATURE_COLS,
     _build_record,
@@ -47,12 +55,24 @@ router = APIRouter(prefix="/api", tags=["patients"])
 # Patient detail columns (may overlap with FEATURE_COLS — deduplication via set
 # is intentional; Python dicts preserve insertion order so the merge is safe).
 _DETAIL_EXTRA_COLS = [
-    "icustay_id", "subject_id", "los", "age",
-    "on_vasopressors", "on_ventilator",
+    "icustay_id",
+    "subject_id",
+    "los",
+    "age",
+    "on_vasopressors",
+    "on_ventilator",
     # Derived guardrail flags (Phase 2) — used to inject risk factors
-    "recent_extubation", "active_bleeding",
-    "hr_mean", "sbp_mean", "dbp_mean", "spo2_mean", "spo2_min",
-    "temp_c_mean", "rr_mean", "gcs_last", "lactate_last",
+    "recent_extubation",
+    "active_bleeding",
+    "hr_mean",
+    "sbp_mean",
+    "dbp_mean",
+    "spo2_mean",
+    "spo2_min",
+    "temp_c_mean",
+    "rr_mean",
+    "gcs_last",
+    "lactate_last",
 ]
 # Merge extra cols + all FEATURE_COLS, preserving order, no duplicates.
 _seen: set[str] = set()
@@ -62,22 +82,31 @@ for _col in _DETAIL_EXTRA_COLS + FEATURE_COLS:
         _PATIENT_COLS.append(_col)
         _seen.add(_col)
 
-_PATIENT_CENSUS_SQL = text(
-    "SELECT " + ", ".join(f'"{c}"' for c in _PATIENT_COLS)
-    + " FROM mimic_iii.census WHERE \"icustay_id\" = :icustay_id"
+# Base SELECT with the icustay_id predicate; a care_unit filter is appended as
+# an extra AND per-request when unit-access enforcement is enabled. With
+# enforcement OFF the scope is None and the executed SQL is identical to the
+# unscoped lookup. With enforcement ON, a patient outside the requesting user's
+# units matches no row and returns a 404 (never a leak).
+_PATIENT_CENSUS_SELECT = (
+    "SELECT "
+    + ", ".join(f'"{c}"' for c in _PATIENT_COLS)
+    + ' FROM mimic_iii.census WHERE "icustay_id" = :icustay_id'
 )
 
 _VITALS_SQL = text(
     'SELECT "charttime", "vital_name", "value"'
     " FROM mimic_iii.census_vitals"
-    " WHERE \"icustay_id\" = :icustay_id"
-    " ORDER BY \"charttime\" ASC"
+    ' WHERE "icustay_id" = :icustay_id'
+    ' ORDER BY "charttime" ASC'
     " LIMIT 500"
 )
 
 # Batch census query: include icustay_id so predictions can be keyed by id.
-_CENSUS_BATCH_SQL = text(
-    'SELECT "icustay_id", ' + ", ".join(f'"{c}"' for c in FEATURE_COLS)
+# Base SELECT; the same care_unit filter is appended so the readiness index is
+# computed within exactly the cohort the user is allowed to see.
+_CENSUS_BATCH_SELECT = (
+    'SELECT "icustay_id", '
+    + ", ".join(f'"{c}"' for c in FEATURE_COLS)
     + " FROM mimic_iii.census"
 )
 
@@ -130,6 +159,7 @@ def get_patient(
     icustay_id: str,
     session: Dependencies.Session,
     ws: Dependencies.Client,
+    care_unit_scope: Dependencies.CareUnitScope,
 ) -> PatientDetail:
     """
     Return full clinical detail for one ICU patient.
@@ -147,17 +177,37 @@ def get_patient(
     9. Return assembled PatientDetail.
 
     All DB and serving errors surface as explicit HTTP errors; none are swallowed.
+    Access is fail-closed: a user in no recognised care-unit group, or a request
+    for a patient outside the user's units, gets a 404 (never a leak).
     """
-    # --- 1. Fetch patient census row ---
+    # --- 0. Fail-closed deny: user in no recognised care-unit group ---
+    if access.scope_denies_all(care_unit_scope):
+        raise HTTPException(
+            status_code=404,
+            detail=(
+                f"Patient icustay_id={icustay_id!r} not found in active census. "
+                "Only current ICU patients are scored."
+            ),
+        )
+
+    # Care-unit predicate reused by both the detail lookup and the batch query
+    # so the readiness index is computed within the user's visible cohort.
+    fragment, cu_params = access.care_unit_filter_clause(care_unit_scope)
+
+    # --- 1. Fetch patient census row (scoped when enforced) ---
+    patient_sql = _PATIENT_CENSUS_SELECT + (f" AND {fragment}" if fragment else "")
     try:
-        result = session.execute(_PATIENT_CENSUS_SQL, {"icustay_id": icustay_id})
+        result = session.execute(
+            text(patient_sql), {"icustay_id": icustay_id, **cu_params}
+        )
         keys = list(result.keys())
         row_tuple = result.fetchone()
     except Exception as exc:
+        # Full error logged server-side; client gets a stable, generic message.
         logger.error("Lakebase census query failed for %s: %s", icustay_id, exc)
         raise HTTPException(
             status_code=503,
-            detail=f"Failed to query Lakebase census: {exc}",
+            detail="Patient data is temporarily unavailable.",
         ) from exc
 
     if row_tuple is None:
@@ -171,38 +221,46 @@ def get_patient(
     row = dict(zip(keys, row_tuple))
 
     # --- 2. Fetch vitals ---
+    # SECURITY: vitals are not care_unit-filtered directly; access is gated by
+    # the scoped step-1 lookup above, which 404s before we reach here if the
+    # patient is outside the user's units. Keep this query AFTER that guard.
     try:
         vitals_result = session.execute(_VITALS_SQL, {"icustay_id": icustay_id})
         vitals_rows = vitals_result.fetchall()
     except Exception as exc:
+        # Full error logged server-side; client gets a stable, generic message.
         logger.error("Lakebase vitals query failed for %s: %s", icustay_id, exc)
         raise HTTPException(
             status_code=503,
-            detail=f"Failed to query Lakebase census_vitals: {exc}",
+            detail="Patient vitals are temporarily unavailable.",
         ) from exc
 
     vitals: list[VitalPoint] = []
     for vrow in vitals_rows:
         charttime, vital_name, value = vrow
         try:
-            vitals.append(VitalPoint(
-                charttime=charttime,
-                vital_name=str(vital_name),
-                value=float(value) if value is not None else 0.0,
-            ))
+            vitals.append(
+                VitalPoint(
+                    charttime=charttime,
+                    vital_name=str(vital_name),
+                    value=float(value) if value is not None else 0.0,
+                )
+            )
         except Exception:
             continue  # skip individual malformed rows only
 
-    # --- 3. Fetch all census feature rows (icustay_id included) ---
+    # --- 3. Fetch all census feature rows (icustay_id included; scoped) ---
+    batch_sql = _CENSUS_BATCH_SELECT + (f" WHERE {fragment}" if fragment else "")
     try:
-        batch_result = session.execute(_CENSUS_BATCH_SQL)
+        batch_result = session.execute(text(batch_sql), cu_params)
         batch_keys = list(batch_result.keys())
         batch_rows = [dict(zip(batch_keys, r)) for r in batch_result.fetchall()]
     except Exception as exc:
+        # Full error logged server-side; client gets a stable, generic message.
         logger.error("Census batch feature fetch failed: %s", exc)
         raise HTTPException(
             status_code=503,
-            detail=f"Failed to fetch census features for index computation: {exc}",
+            detail="Patient data is temporarily unavailable.",
         ) from exc
 
     # Preserve the query order so predictions[i] lines up with batch_rows[i].
@@ -227,8 +285,7 @@ def get_patient(
 
     # Order preserved: ordered_ids[i] ↔ all_predictions[i] (same batch order).
     predictions_by_id: dict[str, dict[str, Any]] = {
-        census_id: pred
-        for census_id, pred in zip(ordered_ids, all_predictions)
+        census_id: pred for census_id, pred in zip(ordered_ids, all_predictions)
     }
 
     all_scores = [float(p.get("readiness_score", 0.0)) for p in all_predictions]
@@ -280,9 +337,7 @@ def get_patient(
     # the list (magnitude = max existing + epsilon).  Dedup is label-based so a
     # model factor carrying the same label is never double-counted.
     existing_labels: set[str] = {f.name for f in response_factors}
-    max_magnitude: float = max(
-        (f.magnitude for f in response_factors), default=0.0
-    )
+    max_magnitude: float = max((f.magnitude for f in response_factors), default=0.0)
     injected: list[FactorOut] = []
     for g in GUARDRAILS:
         if g.kind != "inject_risk":
@@ -291,11 +346,13 @@ def get_patient(
             continue
         if g.label in existing_labels:
             continue
-        injected.append(FactorOut(
-            name=g.label,
-            direction="risk",
-            magnitude=max_magnitude + _INJECT_EPSILON,
-        ))
+        injected.append(
+            FactorOut(
+                name=g.label,
+                direction="risk",
+                magnitude=max_magnitude + _INJECT_EPSILON,
+            )
+        )
         existing_labels.add(g.label)
     if injected:
         response_factors = sorted(

@@ -19,6 +19,7 @@ from fastapi import APIRouter, HTTPException
 from sqlmodel import text
 
 from ..core.dependencies import Dependencies
+from ..lib import access
 from ..lib.feature_labels import normalize_factor
 from ..lib.readiness import compute_readiness_index, readiness_band_from_index
 from ..models import CensusPatient, CensusResponse, FactorOut
@@ -32,23 +33,55 @@ router = APIRouter(prefix="/api", tags=["census"])
 # ---------------------------------------------------------------------------
 
 FEATURE_COLS: list[str] = [
-    "hr_mean", "hr_min", "hr_max", "hr_last",
-    "sbp_mean", "sbp_min", "sbp_max", "sbp_last",
-    "dbp_mean", "dbp_min", "dbp_max", "dbp_last",
-    "spo2_mean", "spo2_min", "spo2_max", "spo2_last",
-    "temp_c_mean", "temp_c_min", "temp_c_max", "temp_c_last",
-    "rr_mean", "rr_min", "rr_max", "rr_last",
-    "on_vasopressors", "on_ventilator",
-    "gcs_last", "lactate_last", "los", "age",
+    "hr_mean",
+    "hr_min",
+    "hr_max",
+    "hr_last",
+    "sbp_mean",
+    "sbp_min",
+    "sbp_max",
+    "sbp_last",
+    "dbp_mean",
+    "dbp_min",
+    "dbp_max",
+    "dbp_last",
+    "spo2_mean",
+    "spo2_min",
+    "spo2_max",
+    "spo2_last",
+    "temp_c_mean",
+    "temp_c_min",
+    "temp_c_max",
+    "temp_c_last",
+    "rr_mean",
+    "rr_min",
+    "rr_max",
+    "rr_last",
+    "on_vasopressors",
+    "on_ventilator",
+    "gcs_last",
+    "lactate_last",
+    "los",
+    "age",
 ]
 
 _SELECT_COLS = ", ".join(
-    f'"{c}"' for c in ["icustay_id", "subject_id", "los", "age",
-                       "on_vasopressors", "on_ventilator"]
+    f'"{c}"'
+    for c in [
+        "icustay_id",
+        "subject_id",
+        "los",
+        "age",
+        "on_vasopressors",
+        "on_ventilator",
+    ]
     + FEATURE_COLS
 )
 
-_CENSUS_SQL = text(f"SELECT {_SELECT_COLS} FROM mimic_iii.census")
+# Base SELECT (no WHERE); a care_unit filter is appended per-request when
+# unit-access enforcement is enabled. With enforcement OFF the scope is None and
+# the executed SQL is byte-identical to the unfiltered query.
+_CENSUS_SELECT = f"SELECT {_SELECT_COLS} FROM mimic_iii.census"
 
 _SERVING_ENDPOINT = "icu-readiness"
 
@@ -165,11 +198,14 @@ def _call_serving(
 def get_census(
     session: Dependencies.Session,
     ws: Dependencies.Client,
+    care_unit_scope: Dependencies.CareUnitScope,
 ) -> CensusResponse:
     """
     Return all current ICU patients ranked by relative readiness index (desc).
 
     Steps:
+    0. Apply the requesting user's care-unit scope (fail-closed) when
+       unit-access enforcement is enabled.
     1. Query Lakebase `mimic_iii.census` for all 40 patients.
     2. Batch-call the `icu-readiness` serving endpoint.
     3. Compute each patient's percentile rank within the cohort.
@@ -178,16 +214,31 @@ def get_census(
     Errors from Lakebase or the serving endpoint are surfaced explicitly
     (HTTP 502 with a descriptive message) — never swallowed.
     """
-    # --- 1. Fetch census rows ---
+    # --- 0. Fail-closed deny: user in no recognised care-unit group ---
+    # Return an empty census (HTTP 200) rather than 403 so the clinician UI
+    # renders its normal empty state; a denied user is indistinguishable from a
+    # genuinely empty census and never receives a patient row.
+    if access.scope_denies_all(care_unit_scope):
+        return CensusResponse(
+            patients=[],
+            total=0,
+            generated_at=datetime.now(timezone.utc).isoformat(),
+        )
+
+    # --- 1. Fetch census rows (scoped to the user's care units when enforced) ---
+    fragment, cu_params = access.care_unit_filter_clause(care_unit_scope)
+    census_sql = _CENSUS_SELECT + (f" WHERE {fragment}" if fragment else "")
     try:
-        result = session.execute(_CENSUS_SQL)
+        result = session.execute(text(census_sql), cu_params)
         keys = list(result.keys())
         rows = [dict(zip(keys, row)) for row in result.fetchall()]
     except Exception as exc:
+        # Full error logged server-side; client gets a stable, generic message
+        # so Postgres schema/topology details are not disclosed in the response.
         logger.error("Lakebase census query failed: %s", exc)
         raise HTTPException(
             status_code=503,
-            detail=f"Failed to query Lakebase census table: {exc}",
+            detail="Census data is temporarily unavailable.",
         ) from exc
 
     if not rows:
@@ -215,12 +266,8 @@ def get_census(
         )
 
     # --- 3. Compute relative readiness indices ---
-    raw_scores = [
-        float(pred.get("readiness_score", 0.0)) for pred in predictions
-    ]
-    indices = [
-        compute_readiness_index(s, raw_scores) for s in raw_scores
-    ]
+    raw_scores = [float(pred.get("readiness_score", 0.0)) for pred in predictions]
+    indices = [compute_readiness_index(s, raw_scores) for s in raw_scores]
 
     # --- 4. Build patient summaries ---
     # Order preserved: rows[i] ↔ predictions[i] ↔ indices[i] (same batch order).
@@ -243,11 +290,13 @@ def get_census(
                 f.get("direction", "risk"),
                 float(f.get("magnitude", 0.0)),
             )
-            top_factors.append(FactorOut(
-                name=label,
-                direction=direction,
-                magnitude=magnitude,
-            ))
+            top_factors.append(
+                FactorOut(
+                    name=label,
+                    direction=direction,
+                    magnitude=magnitude,
+                )
+            )
 
         patients.append(
             CensusPatient(

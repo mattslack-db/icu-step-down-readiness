@@ -30,7 +30,9 @@ from icu_step_down.backend.routers.census import FEATURE_COLS
 # ---------------------------------------------------------------------------
 
 
-def _make_session(census_row: dict | None, vitals_rows: list | None = None) -> MagicMock:
+def _make_session(
+    census_row: dict | None, vitals_rows: list | None = None
+) -> MagicMock:
     """Return a mock session that serves census_row for all three SQL queries."""
     session = MagicMock()
 
@@ -42,22 +44,22 @@ def _make_session(census_row: dict | None, vitals_rows: list | None = None) -> M
             result.fetchall.return_value = vitals_rows or []
             return result
 
-        if params is None:
+        # Single patient detail lookup (has the icustay_id predicate)
+        if 'icustay_id" = :icustay_id' in sql_text:
             if census_row is not None:
                 result.keys.return_value = list(census_row.keys())
-                result.fetchall.return_value = [
-                    tuple(census_row[k] for k in census_row)
-                ]
+                result.fetchone.return_value = tuple(census_row[k] for k in census_row)
             else:
-                result.keys.return_value = []
-                result.fetchall.return_value = []
+                result.fetchone.return_value = None
             return result
 
+        # Batch census query (no icustay_id predicate)
         if census_row is not None:
             result.keys.return_value = list(census_row.keys())
-            result.fetchone.return_value = tuple(census_row[k] for k in census_row)
+            result.fetchall.return_value = [tuple(census_row[k] for k in census_row)]
         else:
-            result.fetchone.return_value = None
+            result.keys.return_value = []
+            result.fetchall.return_value = []
         return result
 
     session.execute.side_effect = _execute
@@ -114,7 +116,7 @@ def _call_patient(icustay_id: str, census_row: dict, ws: MagicMock):
 
     patients_mod.build_narrative = stub_narrative
     try:
-        return get_patient(icustay_id, session, ws)
+        return get_patient(icustay_id, session, ws, None)
     finally:
         patients_mod.build_narrative = original_build
 
@@ -139,11 +141,7 @@ def test_active_bleeding_flag_injects_single_risk_factor():
     # Assert
     labels = [f.name for f in detail.factors]
     assert labels.count("active bleeding / coagulopathy") == 1
-    assert all(
-        f.direction == "risk"
-        for f in detail.factors
-        if "bleeding" in f.name
-    )
+    assert all(f.direction == "risk" for f in detail.factors if "bleeding" in f.name)
 
 
 def test_active_bleeding_injected_factor_dedup():
@@ -199,11 +197,7 @@ def test_recent_extubation_flag_injects_single_risk_factor():
     # Assert
     labels = [f.name for f in detail.factors]
     assert labels.count("recently extubated (<24h)") == 1
-    assert all(
-        f.direction == "risk"
-        for f in detail.factors
-        if "extubat" in f.name
-    )
+    assert all(f.direction == "risk" for f in detail.factors if "extubat" in f.name)
 
 
 def test_recent_extubation_false_does_not_inject():
@@ -245,10 +239,13 @@ def test_injected_factor_magnitude_exceeds_existing_factors():
     they sort to the top of the factor list.
     """
     row = _census_row("999001", active_bleeding=True)
-    ws = _make_ws(score=0.45, factors=[
-        {"name": "lactate_last", "direction": "risk", "magnitude": 0.26},
-        {"name": "gcs_last", "direction": "supports", "magnitude": 0.15},
-    ])
+    ws = _make_ws(
+        score=0.45,
+        factors=[
+            {"name": "lactate_last", "direction": "risk", "magnitude": 0.26},
+            {"name": "gcs_last", "direction": "supports", "magnitude": 0.15},
+        ],
+    )
 
     detail = _call_patient("999001", row, ws)
 
@@ -256,7 +253,8 @@ def test_injected_factor_magnitude_exceeds_existing_factors():
         f for f in detail.factors if f.name == "active bleeding / coagulopathy"
     )
     max_model_magnitude = max(
-        f.magnitude for f in detail.factors
+        f.magnitude
+        for f in detail.factors
         if f.name != "active bleeding / coagulopathy"
     )
     assert injected.magnitude > max_model_magnitude
@@ -317,9 +315,12 @@ def test_injected_risk_factors_passed_to_build_narrative():
     """
     # Arrange: one model factor + active_bleeding flag set
     row = _census_row("999005", active_bleeding=True)
-    ws = _make_ws(score=0.45, factors=[
-        {"name": "lactate_last", "direction": "risk", "magnitude": 0.26},
-    ])
+    ws = _make_ws(
+        score=0.45,
+        factors=[
+            {"name": "lactate_last", "direction": "risk", "magnitude": 0.26},
+        ],
+    )
 
     captured_factors: list = []
 
@@ -331,15 +332,15 @@ def test_injected_risk_factors_passed_to_build_narrative():
     patients_mod.build_narrative = capture_narrative
     try:
         session = _make_session(row)
-        get_patient("999005", session, ws)
+        get_patient("999005", session, ws, None)
     finally:
         patients_mod.build_narrative = original_build
 
     # Assert: injected guardrail label is present in captured factors
     factor_names = [f.name for f in captured_factors]
-    assert "active bleeding / coagulopathy" in factor_names, (
-        f"Expected 'active bleeding / coagulopathy' in narrative factors, got: {factor_names}"
-    )
+    assert (
+        "active bleeding / coagulopathy" in factor_names
+    ), f"Expected 'active bleeding / coagulopathy' in narrative factors, got: {factor_names}"
 
 
 # ---------------------------------------------------------------------------

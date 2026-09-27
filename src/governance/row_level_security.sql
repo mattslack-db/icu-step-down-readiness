@@ -37,9 +37,13 @@
 --   Because the app SP is in icu_admins, it sees all rows from all care units;
 --   the UC row filter is bypassed on the Lakebase path entirely.
 --
---   App-level per-team scoping is a documented follow-up (not implemented here).
---   See README.md § Governance and
---   app/src/icu_step_down/backend/lib/access.py (care_unit_filter_for_user).
+--   App-level per-team scoping IS implemented on the Lakebase path, as a
+--   separate enforcement layer sharing this same care_unit mapping: the
+--   census/patient/analytics routes scope their reads to the requesting user's
+--   icu_* groups when the enforce_unit_access config flag is ON (fail-closed;
+--   default OFF). See README.md § Governance and
+--   app/src/icu_step_down/backend/lib/access.py (care_unit_filter_for_user,
+--   care_units_from_me, care_unit_filter_clause) + core/_access.py.
 -- =============================================================================
 
 

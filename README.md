@@ -62,6 +62,13 @@ The [`evidence/raw/`](evidence/raw/) directory holds **verbatim CLI/API output**
 - [`evidence/raw/lakebase-query.txt`](evidence/raw/lakebase-query.txt) — Lakebase synced tables ONLINE + row counts read from Postgres
 - [`evidence/raw/app-deploy.txt`](evidence/raw/app-deploy.txt) — Databricks App RUNNING + startup logs
 
+Clinical-enhancement evidence (captured 2026-09-26):
+
+- [`evidence/raw/gold-derived-signals.txt`](evidence/raw/gold-derived-signals.txt) — prevalence of the derived guardrail signals `recent_extubation` / `active_bleeding` across the cohort and current census
+- [`evidence/raw/care-unit-distribution.txt`](evidence/raw/care-unit-distribution.txt) — synthetic `care_unit` (MICU/SICU/CCU) distribution over census and full cohort
+- [`evidence/raw/drift-run.txt`](evidence/raw/drift-run.txt) — live drift job run: PSI 2.15 / KS 0.22 (verdict `drift`) vs the training baseline
+- [`evidence/raw/drift-baseline.txt`](evidence/raw/drift-baseline.txt) — training-cohort score-decile baseline the drift check compares against
+
 See [`evidence/raw/README.md`](evidence/raw/README.md) for the capture method and how to reproduce.
 
 ---
@@ -109,10 +116,10 @@ databricks bundle deploy   -t sandbox --profile icu-sandbox   # pipeline, model 
 
 Unity Catalog governance (comments, PII tags, grants) is defined in [`src/governance/governance.sql`](src/governance/governance.sql). Unit-level row-access control — a fail-closed row filter on `census` and `patient_features` scoped to UC account groups `icu_admins`, `icu_micu`, `icu_sicu`, `icu_ccu` — is defined in [`src/governance/row_level_security.sql`](src/governance/row_level_security.sql). Both files must be re-run after any Lakeflow pipeline recreate because Materialized View metadata (comments, tags, and row-filter bindings) is lost on DROP/CREATE.
 
-**Governance scope of the UC row filter vs. the app path:**
-The `rls_care_unit` row filter enforces per-care-team access for **direct Unity Catalog / SQL-warehouse access** to `gold.census` and `gold.patient_features`. The Databricks App reads **Lakebase-synced Postgres copies** (`mimic_iii.census`, `mimic_iii.patient_features`) using the app service principal, which is a member of `icu_admins`. Because the UC row filter governs only the UC layer, the Lakebase copies are not subject to it — the app SP sees all rows from all care units regardless of which care-unit group the requesting user belongs to.
+**Two enforcement layers, one care_unit mapping:**
+The `rls_care_unit` row filter enforces per-care-team access for **direct Unity Catalog / SQL-warehouse access** to `gold.census` and `gold.patient_features`. The Databricks App reads **Lakebase-synced Postgres copies** (`mimic_iii.census`, `mimic_iii.patient_features`) using the app service principal (a member of `icu_admins`), which the UC row filter cannot reach — so app-side enforcement is applied separately.
 
-**Follow-up (not implemented in this phase):** App-level per-team scoping would require either Postgres row security policies on the synced Lakebase tables, or app-side filtering by the requester's care-unit group. The helper `care_unit_filter_for_user` in [`app/src/icu_step_down/backend/lib/access.py`](app/src/icu_step_down/backend/lib/access.py) provides the mapping logic (icu_admins → None/all; icu_micu → ["MICU"]; etc.) ready to be wired into the query path when this enforcement is added.
+**App-side per-team scoping (wired, config-gated):** The census, patient-detail, and analytics routes scope their Lakebase reads to the requesting user's `care_unit` groups. Enforcement is controlled by the `enforce_unit_access` config flag (env `<APP_SLUG>_ENFORCE_UNIT_ACCESS`), which **defaults to OFF** so the deployment's behaviour is unchanged until an operator enables it and verifies OBO group resolution live. When ON, the user's icu_* group memberships are read from the OBO `current_user.me()` result and mapped via `care_unit_filter_for_user` in [`app/src/icu_step_down/backend/lib/access.py`](app/src/icu_step_down/backend/lib/access.py) (icu_admins → all; icu_micu → MICU; etc.); a user in no recognised group is **denied all rows (fail-closed)**, and a request for a patient outside the user's units returns 404. The resolution and predicate helpers are unit-tested in `app/tests/lib/test_access.py`, and the route-level deny/scope wiring in `app/tests/routers/test_unit_access_enforcement.py`.
 
 ## Model honesty
 

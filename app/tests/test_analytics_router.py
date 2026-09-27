@@ -38,15 +38,16 @@ class TestGlobalFeatureImportance:
 
     def test_sorted_descending(self) -> None:
         importances = [imp for _, imp in _GLOBAL_FEATURE_IMPORTANCE]
-        assert importances == sorted(importances, reverse=True), \
-            "Feature importance should be sorted descending"
+        assert importances == sorted(
+            importances, reverse=True
+        ), "Feature importance should be sorted descending"
 
     def test_all_features_in_feature_labels(self) -> None:
         """All tracked features should have a human-readable label."""
         for name, _ in _GLOBAL_FEATURE_IMPORTANCE:
-            assert name in FEATURE_LABELS, (
-                f"Feature '{name}' in importance list has no label in FEATURE_LABELS"
-            )
+            assert (
+                name in FEATURE_LABELS
+            ), f"Feature '{name}' in importance list has no label in FEATURE_LABELS"
 
     def test_top_feature_is_lactate(self) -> None:
         """Lactate is the dominant feature in the v2 model (importance ~0.246)."""
@@ -84,9 +85,9 @@ class TestFeatureColsAlignment:
     def test_all_importance_features_are_in_feature_cols(self) -> None:
         """Every feature tracked in global importance must be in the feature column list."""
         for name, _ in _GLOBAL_FEATURE_IMPORTANCE:
-            assert name in FEATURE_COLS, (
-                f"Importance feature '{name}' not in FEATURE_COLS"
-            )
+            assert (
+                name in FEATURE_COLS
+            ), f"Importance feature '{name}' not in FEATURE_COLS"
 
 
 # ---------------------------------------------------------------------------
@@ -143,16 +144,16 @@ class TestDriftSqlTargetsLakebase:
     def test_psi_sql_uses_mimic_iii_schema(self) -> None:
         """Drift PSI SQL must query the Lakebase mimic_iii schema, not gold."""
         sql_text = str(_DRIFT_PSI_SQL)
-        assert "mimic_iii.readiness_drift" in sql_text, (
-            "PSI SQL must reference mimic_iii.readiness_drift (Lakebase synced table)"
-        )
+        assert (
+            "mimic_iii.readiness_drift" in sql_text
+        ), "PSI SQL must reference mimic_iii.readiness_drift (Lakebase synced table)"
 
     def test_ks_sql_uses_mimic_iii_schema(self) -> None:
         """Drift KS SQL must query the Lakebase mimic_iii schema, not gold."""
         sql_text = str(_DRIFT_KS_SQL)
-        assert "mimic_iii.readiness_drift" in sql_text, (
-            "KS SQL must reference mimic_iii.readiness_drift (Lakebase synced table)"
-        )
+        assert (
+            "mimic_iii.readiness_drift" in sql_text
+        ), "KS SQL must reference mimic_iii.readiness_drift (Lakebase synced table)"
 
     def test_psi_sql_does_not_reference_gold_schema(self) -> None:
         """gold.readiness_drift is a UC table and not queryable via Postgres."""
@@ -174,7 +175,7 @@ class TestBandDistributionViaRoute:
         # Raw scores will be rank-normalised into indices roughly 0, 20, 40, 60, 80, 100
         scores = [0.10, 0.20, 0.30, 0.70, 0.80, 0.90]
 
-        resp = get_analytics(_make_session(rows), _make_ws(scores))
+        resp = get_analytics(_make_session(rows), _make_ws(scores), None)
 
         band_map = {b.band: b.count for b in resp.band_distribution}
         # Ready (index ≥ 66): two highest scores → 2
@@ -190,7 +191,7 @@ class TestBandDistributionViaRoute:
         rows = [_census_row(f"icu-{i}") for i in range(10)]
         scores = [float(i) / 10.0 for i in range(10)]
 
-        resp = get_analytics(_make_session(rows), _make_ws(scores))
+        resp = get_analytics(_make_session(rows), _make_ws(scores), None)
 
         total_pct = sum(b.pct for b in resp.band_distribution)
         assert total_pct == pytest.approx(100.0, abs=1.0)
@@ -200,7 +201,7 @@ class TestBandDistributionViaRoute:
         session = _make_session([])
         ws = _make_ws([])
 
-        resp = get_analytics(session, ws)
+        resp = get_analytics(session, ws, None)
 
         assert resp.total_census == 0
         assert resp.band_distribution == []

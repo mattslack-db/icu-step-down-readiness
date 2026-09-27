@@ -20,6 +20,15 @@ confirmed to have actually executed end to end.
 | [`lakebase-query.txt`](lakebase-query.txt) | Lakebase | Synced tables ONLINE (`census`, `patient_features`, `census_vitals`) + row counts read from the Lakebase Postgres via the `mimic_iii` catalog |
 | [`app-deploy.txt`](app-deploy.txt) | Databricks App | App `icu-step-down` RUNNING + uvicorn startup logs (Lakebase connection succeeded) |
 
+Clinical-enhancement evidence (captured 2026-09-26):
+
+| File | Stage | What it proves |
+|------|-------|----------------|
+| [`gold-derived-signals.txt`](gold-derived-signals.txt) | Gold (guardrails) | Prevalence of derived `recent_extubation` / `active_bleeding` signals across the 61,532-stay cohort and the 40-patient census |
+| [`care-unit-distribution.txt`](care-unit-distribution.txt) | Gold (governance) | Synthetic `care_unit` (MICU/SICU/CCU) distribution over census and full cohort — the dimension the row filter and app scope enforce on |
+| [`drift-run.txt`](drift-run.txt) | Monitoring | Live drift job (SUCCESS): PSI 2.1528 / KS 0.2205 (verdict `drift`, n_live 40) vs training baseline, scored via UC model `readiness_model/2` |
+| [`drift-baseline.txt`](drift-baseline.txt) | Monitoring | Training-cohort score-decile baseline the drift check compares live scores against |
+
 ## How to reproduce
 
 ```bash

@@ -24,6 +24,7 @@ from fastapi import APIRouter, HTTPException
 from sqlmodel import text
 
 from ..core.dependencies import Dependencies
+from ..lib import access
 from ..lib.feature_labels import FEATURE_LABELS
 from ..lib.readiness import compute_readiness_index, readiness_band_from_index
 from ..models import (
@@ -62,8 +63,9 @@ _GLOBAL_FEATURE_IMPORTANCE: list[tuple[str, float]] = [
 ]
 
 # Analytics SQL: icustay_id + all FEATURE_COLS (which already include los,
-# on_vasopressors, on_ventilator — no duplication).
-_ANALYTICS_SQL = text(
+# on_vasopressors, on_ventilator — no duplication). Base SELECT only; a
+# care_unit filter is appended per-request when unit-access enforcement is on.
+_ANALYTICS_SELECT = (
     'SELECT "icustay_id", '
     + ", ".join(f'"{c}"' for c in FEATURE_COLS)
     + " FROM mimic_iii.census"
@@ -108,28 +110,46 @@ _DRIFT_KS_SQL = text(
 def get_analytics(
     session: Dependencies.Session,
     ws: Dependencies.Client,
+    care_unit_scope: Dependencies.CareUnitScope,
 ) -> AnalyticsResponse:
     """
     Return aggregate analytics for the current ICU census.
 
     Steps:
+    0. Apply the requesting user's care-unit scope (fail-closed) when enforced.
     1. Query `mimic_iii.census` for all patients + feature columns.
     2. Batch-call `icu-readiness` to get scores for the whole cohort.
     3. Compute relative indices → bands → aggregate stats.
     4. Return aggregates (no individual patient rows).
     """
-    # --- 1. Fetch all census rows ---
+    # --- 0. Fail-closed deny: user in no recognised care-unit group ---
+    # Empty aggregates (HTTP 200) mirror the empty-census path so the UI renders
+    # its normal empty state; a denied user never receives patient-derived stats.
+    if access.scope_denies_all(care_unit_scope):
+        return AnalyticsResponse(
+            total_census=0,
+            band_distribution=[],
+            feature_importance=_feature_importance_items(),
+            avg_los_by_band={},
+            vent_rate=0.0,
+            vasopressor_rate=0.0,
+            generated_at=datetime.now(timezone.utc).isoformat(),
+            drift_status=None,
+        )
+
+    # --- 1. Fetch all census rows (scoped when enforced) ---
+    fragment, cu_params = access.care_unit_filter_clause(care_unit_scope)
+    analytics_sql = _ANALYTICS_SELECT + (f" WHERE {fragment}" if fragment else "")
     try:
-        result = session.execute(_ANALYTICS_SQL)
+        result = session.execute(text(analytics_sql), cu_params)
         keys = list(result.keys())
-        rows: list[dict[str, Any]] = [
-            dict(zip(keys, row)) for row in result.fetchall()
-        ]
+        rows: list[dict[str, Any]] = [dict(zip(keys, row)) for row in result.fetchall()]
     except Exception as exc:
+        # Full error logged server-side; client gets a stable, generic message.
         logger.error("Lakebase analytics query failed: %s", exc)
         raise HTTPException(
             status_code=503,
-            detail=f"Failed to query Lakebase for analytics: {exc}",
+            detail="Analytics data is temporarily unavailable.",
         ) from exc
 
     # --- 1b. Fetch latest drift status (graceful degradation) ---
@@ -191,12 +211,8 @@ def get_analytics(
     }
 
     # Vent and vasopressor rates
-    vent_count = sum(
-        1 for row in rows if row.get("on_ventilator")
-    )
-    vaso_count = sum(
-        1 for row in rows if row.get("on_vasopressors")
-    )
+    vent_count = sum(1 for row in rows if row.get("on_ventilator"))
+    vaso_count = sum(1 for row in rows if row.get("on_vasopressors"))
     vent_rate = round(vent_count / total, 4) if total > 0 else 0.0
     vasopressor_rate = round(vaso_count / total, 4) if total > 0 else 0.0
 
@@ -226,9 +242,11 @@ def _fetch_drift_status(session: Any) -> DriftStatus | None:
         psi_row = psi_result.fetchone()
         if psi_row is None:
             return None
-        psi_keys = list(psi_result.keys()) if hasattr(psi_result, "keys") else [
-            "value", "verdict", "n_live", "model_version", "computed_at"
-        ]
+        psi_keys = (
+            list(psi_result.keys())
+            if hasattr(psi_result, "keys")
+            else ["value", "verdict", "n_live", "model_version", "computed_at"]
+        )
         psi_data = dict(zip(psi_keys, psi_row))
 
         # --- KS row (optional — graceful fallback to None if absent) ---------
@@ -250,9 +268,7 @@ def _fetch_drift_status(session: Any) -> DriftStatus | None:
             computed_at=str(psi_data.get("computed_at", "")),
         )
     except Exception as exc:
-        logger.info(
-            "Drift table not yet available (graceful degradation): %s", exc
-        )
+        logger.info("Drift table not yet available (graceful degradation): %s", exc)
         return None
 
 

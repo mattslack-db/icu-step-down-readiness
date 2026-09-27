@@ -15,6 +15,13 @@ class _ConfigDependency(LifespanDependency):
     async def lifespan(self, app: FastAPI) -> AsyncGenerator[None, None]:
         app.state.config = AppConfig()
         logger.info(f"Starting app with configuration:\n{app.state.config}")
+        if not app.state.config.enforce_unit_access:
+            logger.warning(
+                "enforce_unit_access is OFF — every authenticated user sees ALL "
+                "census/patient/analytics rows regardless of care-unit group. "
+                "Set <APP_SLUG>_ENFORCE_UNIT_ACCESS=true to enable fail-closed "
+                "per-care-team scoping on the Lakebase read path."
+            )
         yield
 
     @staticmethod

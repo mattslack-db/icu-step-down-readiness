@@ -5,6 +5,7 @@ Adaptation note: this project has no `client_with_stub_db` pytest fixture.
 Tests call the route handler directly with mock session and workspace client
 objects — matching the pattern established in test_analytics_router.py.
 """
+
 from __future__ import annotations
 
 import json
@@ -21,7 +22,9 @@ from icu_step_down.backend.routers.census import FEATURE_COLS
 # ---------------------------------------------------------------------------
 
 
-def _make_session(census_row: dict | None, vitals_rows: list | None = None) -> MagicMock:
+def _make_session(
+    census_row: dict | None, vitals_rows: list | None = None
+) -> MagicMock:
     """
     Return a mock session that:
     - For the single-patient lookup (first execute): returns census_row.
@@ -39,24 +42,22 @@ def _make_session(census_row: dict | None, vitals_rows: list | None = None) -> M
             result.fetchall.return_value = vitals_rows or []
             return result
 
-        # Batch census (no params)
-        if params is None:
+        # Single patient detail lookup (has the icustay_id predicate)
+        if 'icustay_id" = :icustay_id' in sql_text:
             if census_row is not None:
                 result.keys.return_value = list(census_row.keys())
-                result.fetchall.return_value = [
-                    tuple(census_row[k] for k in census_row)
-                ]
+                result.fetchone.return_value = tuple(census_row[k] for k in census_row)
             else:
-                result.keys.return_value = []
-                result.fetchall.return_value = []
+                result.fetchone.return_value = None
             return result
 
-        # Single patient detail lookup
+        # Batch census query (no icustay_id predicate)
         if census_row is not None:
             result.keys.return_value = list(census_row.keys())
-            result.fetchone.return_value = tuple(census_row[k] for k in census_row)
+            result.fetchall.return_value = [tuple(census_row[k] for k in census_row)]
         else:
-            result.fetchone.return_value = None
+            result.keys.return_value = []
+            result.fetchall.return_value = []
         return result
 
     session.execute.side_effect = _execute
@@ -112,6 +113,7 @@ def test_patient_detail_includes_care_plan():
 
     # Stub the narrative so we don't hit Databricks
     import icu_step_down.backend.routers.patients as patients_mod
+
     original_build = patients_mod.build_narrative
 
     def stub_narrative(*args, **kwargs):
@@ -119,7 +121,7 @@ def test_patient_detail_includes_care_plan():
 
     patients_mod.build_narrative = stub_narrative
     try:
-        detail = get_patient("224403", session, ws)
+        detail = get_patient("224403", session, ws, None)
     finally:
         patients_mod.build_narrative = original_build
 
