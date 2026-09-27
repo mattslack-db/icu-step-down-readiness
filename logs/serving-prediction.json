@@ -1,0 +1,32 @@
+{
+  "endpoint": "icu-readiness",
+  "model": "icu_step_down.ml.readiness_model",
+  "model_version": 2,
+  "captured": "2026-09-25T21:51:48Z",
+  "profile": "icu-sandbox",
+  "note": "Two patients, 30 features each. on_ventilator is returned as 'risk' regardless of raw SHAP sign — the always-flag-known-risks clinical-safety override, live.",
+  "predictions": [
+    {
+      "patient": "A (stable / off support)",
+      "readiness_score": 0.4738641185006906,
+      "factors": [
+        { "name": "lactate_last",  "direction": "risk",     "magnitude": 0.2617 },
+        { "name": "on_ventilator", "direction": "risk",     "magnitude": 0.0299 },
+        { "name": "rr_last",       "direction": "supports", "magnitude": 0.0286 },
+        { "name": "rr_mean",       "direction": "supports", "magnitude": 0.0270 },
+        { "name": "spo2_last",     "direction": "risk",     "magnitude": 0.0265 }
+      ]
+    },
+    {
+      "patient": "B (critical, on pressors + ventilator)",
+      "readiness_score": 0.46317457289329145,
+      "factors": [
+        { "name": "lactate_last",  "direction": "risk",     "magnitude": 0.1997 },
+        { "name": "rr_min",        "direction": "risk",     "magnitude": 0.1099 },
+        { "name": "hr_mean",       "direction": "supports", "magnitude": 0.0797 },
+        { "name": "age",           "direction": "risk",     "magnitude": 0.0635 },
+        { "name": "temp_c_mean",   "direction": "supports", "magnitude": 0.0246 }
+      ]
+    }
+  ]
+}

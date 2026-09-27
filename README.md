@@ -10,8 +10,10 @@ An end-to-end Databricks data journey that helps ICU clinicians identify which p
 
 ## ✅ Proof this build actually ran (readable execution evidence)
 
-Full readable run output is committed at **[`EVIDENCE.md`](EVIDENCE.md)** and, raw, in
-**[`evidence/raw/`](evidence/raw/)**. Headline results, as committed text:
+Committed run output lives in three places: the top-level **[`logs/`](logs/)** folder
+(multi-format — `.log`, `.csv`, `.json`, `.md`, and a **[notebook with cell outputs](logs/execution-evidence.ipynb)**),
+the narrative **[`EVIDENCE.md`](EVIDENCE.md)**, and the raw **[`evidence/raw/`](evidence/raw/)** captures.
+Headline results, as committed text:
 
 - **Lakeflow pipeline run — COMPLETED**, bronze→gold row counts: bronze `admissions 58,976` / `chart_events 38,776,289` / `lab_events 27,854,055` → gold `patient_features 61,532`, `readiness_training_set 61,532`, `census 40`. ([`evidence/raw/pipeline-run.txt`](evidence/raw/pipeline-run.txt))
 - **Query against governed gold tables:** census cohort n=40, avg LOS 2.83d, 8 on pressors / 11 on vent; training label balance 59,706 ready / 1,826 not-ready. ([`evidence/raw/gold-queries.txt`](evidence/raw/gold-queries.txt))

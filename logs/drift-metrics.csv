@@ -1,0 +1,3 @@
+metric,value,verdict,n_live,model_version,captured
+PSI,2.1528,drift,40,2,2026-09-26T21:57:14Z
+KS,0.2205,drift,40,2,2026-09-26T21:57:14Z

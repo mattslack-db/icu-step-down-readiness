@@ -1,0 +1,17 @@
+query,field,value
+gold_row_counts,census,40
+gold_row_counts,patient_features,61532
+gold_row_counts,readiness_training_set,61532
+label_balance,not_ready_label0_n,1826
+label_balance,not_ready_label0_pct,3.0
+label_balance,ready_label1_n,59706
+label_balance,ready_label1_pct,97.0
+support_prevalence,neither,32342
+support_prevalence,ventilator_only,11966
+support_prevalence,vasopressors_only,3207
+support_prevalence,both,14017
+census_cohort,patients,40
+census_cohort,avg_age,54.8
+census_cohort,avg_los_days,2.83
+census_cohort,on_pressors,8
+census_cohort,on_vent,11

@@ -11,7 +11,7 @@
 
 ## ✅ This build actually ran (readable execution evidence)
 
-Full output is in [`../EVIDENCE.md`](../EVIDENCE.md) / [`../evidence/raw/`](../evidence/raw/). Headline results, as committed text:
+Full output: top-level [`../logs/`](../logs/) (`.log` / `.csv` / `.json` / `.md` + a [notebook with cell outputs](../logs/execution-evidence.ipynb)), [`../EVIDENCE.md`](../EVIDENCE.md), and raw [`../evidence/raw/`](../evidence/raw/). Headline results, as committed text:
 
 - **Lakeflow pipeline — COMPLETED**: bronze `chart_events 38,776,289` / `admissions 58,976` → gold `patient_features 61,532`, `census 40`.
 - **Gold query** (`icu_step_down.gold.census`): 40 current patients, avg LOS 2.83d, 8 on pressors / 11 on ventilator.

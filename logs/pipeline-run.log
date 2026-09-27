@@ -1,0 +1,40 @@
+# Lakeflow pipeline run — icu-step-down-readiness-medallion
+# Captured: 2026-09-25T22:03:44Z | profile: icu-sandbox | workspace: fe-sandbox-icu-step-down-readiness
+# Pipeline ID: f216d643-ef34-425f-a09a-f1b797b55395 | Update ID: a28ac017-be1b-4555-92f2-d3fa587c5e91
+# Update state: COMPLETED
+
+[2026-09-25T22:00:20] flow_progress: bronze.patients COMPLETED
+[2026-09-25T22:00:20] flow_progress: bronze.admissions COMPLETED
+[2026-09-25T22:00:20] flow_progress: bronze.transfers COMPLETED
+[2026-09-25T22:00:20] flow_progress: bronze.services COMPLETED
+[2026-09-25T22:00:20] flow_progress: bronze.icu_stays COMPLETED
+[2026-09-25T22:00:20] flow_progress: bronze.d_labitems COMPLETED
+[2026-09-25T22:00:20] flow_progress: bronze.procedure_events_mv COMPLETED
+[2026-09-25T22:00:28] flow_progress: bronze.input_events_cv COMPLETED
+[2026-09-25T22:00:29] flow_progress: bronze.input_events_mv COMPLETED
+[2026-09-25T22:00:30] flow_progress: bronze.lab_events COMPLETED
+[2026-09-25T22:00:30] flow_progress: bronze.chart_events COMPLETED
+[2026-09-25T22:00:25] flow_progress: silver.icu_stays COMPLETED
+[2026-09-25T22:00:25] flow_progress: silver.patients COMPLETED
+[2026-09-25T22:00:42] flow_progress: silver.vital_signs COMPLETED
+[2026-09-25T22:00:46] flow_progress: silver.lab_events COMPLETED
+[2026-09-25T22:00:54] flow_progress: gold.patient_features COMPLETED
+[2026-09-25T22:00:57] flow_progress: gold.census COMPLETED
+[2026-09-25T22:00:58] flow_progress: gold.readiness_training_set COMPLETED
+[2026-09-25T22:00:58] update_progress: Update a28ac0 is COMPLETED
+
+# Per-table row counts (queried directly after the run)
+LAYER   TABLE                    ROWS
+bronze  admissions               58,976
+bronze  chart_events             38,776,289
+bronze  icu_stays                61,532
+bronze  lab_events               27,854,055
+bronze  patients                 46,520
+bronze  transfers                261,897
+silver  icu_stays                61,532
+silver  lab_events               24,932,835
+silver  patients                 46,520
+silver  vital_signs              21,771,413
+gold    patient_features         61,532
+gold    readiness_training_set   61,532
+gold    census                   40
