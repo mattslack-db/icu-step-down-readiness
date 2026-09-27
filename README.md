@@ -31,7 +31,7 @@ Headline results, as committed text:
 | **README** — what it does + how to run | this file (below) |
 | **BUILD.md** — workflow, AI tools/prompts, decisions, where AI was used | [`BUILD.md`](BUILD.md) |
 | **Execution evidence** — run outputs, notebook w/ outputs, test run | [`logs/`](logs/) (`.log`/`.csv`/`.json`/`.md`/`.ipynb`), [`EVIDENCE.md`](EVIDENCE.md), [`evidence/raw/`](evidence/raw/) |
-| **Architecture diagram** | [`evidence/architecture.md`](evidence/architecture.md) (Mermaid, text) |
+| **Architecture diagram** | [`evidence/architecture.md`](evidence/architecture.md) (Mermaid text — always collected) + [`evidence/architecture.png`](evidence/architecture.png) (rendered image) |
 | **Screenshots** (app / analytics / patient detail) | `evidence/screenshot-*.png` — **binary; attach separately** (repo collector excludes binaries) |
 | **Presentation** | [`deck/icu-step-down-readiness.pdf`](deck/icu-step-down-readiness.pdf) — **attach the PDF separately** (HTML alone not accepted; binaries excluded from repo scan) |
 | **Demo recording link** | [`evidence/RECORDING.md`](evidence/RECORDING.md) — _submitter adds link_ |

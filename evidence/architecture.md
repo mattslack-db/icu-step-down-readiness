@@ -1,30 +1,32 @@
 # Architecture — ICU Step-Down Readiness
 
-Text diagram (Mermaid) of the end-to-end, fully Databricks-native journey. One
-governed gold feature set feeds the model, the app, and Genie. Committed as text
-(the repo collector excludes binary images), so it is readable by reviewers.
+End-to-end, fully Databricks-native journey. One governed gold feature set feeds
+the model, the app, and Genie. Provided **both** as a rendered image
+([`architecture.png`](architecture.png)) and as the **Mermaid text below** — the
+repo collector excludes binary images, so the text version is the one guaranteed
+to reach reviewers.
+
+![ICU Step-Down Readiness architecture](architecture.png)
 
 ```mermaid
 flowchart LR
-  subgraph Source
-    M[(MIMIC-III\nDelta Share)]
-  end
-  subgraph Lakeflow["Lakeflow medallion (Unity Catalog)"]
-    B[bronze\nraw MVs]
-    S[silver\ntyped · vitals unpivot · lab flags]
-    G[gold\npatient_features · readiness_training_set · census]
+  M[(MIMIC-III<br/>Delta Share)]
+  subgraph Lakeflow["Lakeflow medallion — Unity Catalog"]
+    B[bronze<br/>raw MVs]
+    S[silver<br/>typed · vitals unpivot · lab flags]
+    G[gold<br/>patient_features · readiness_training_set · census]
     B --> S --> G
   end
   subgraph ML["Mosaic AI"]
-    MODEL[readiness_model v2\nLightGBM + SHAP]
-    EP[[serving endpoint\nicu-readiness]]
+    MODEL[readiness_model v2<br/>LightGBM + SHAP]
+    EP[[serving endpoint<br/>icu-readiness]]
     MODEL --> EP
   end
-  FM[[Foundation Model API\nclinical narrative]]
-  GEN[[Genie space\nNL → SQL]]
-  LB[(Lakebase\nPostgres synced tables)]
-  APP[Databricks App\nReact + FastAPI]
-  DRIFT[drift job\nPSI / KS]
+  FM[[Foundation Model API<br/>clinical narrative]]
+  GEN[[Genie space<br/>NL to SQL]]
+  LB[(Lakebase<br/>Postgres synced tables)]
+  APP[Databricks App<br/>React + FastAPI]
+  DRIFT[drift job<br/>PSI / KS]
 
   M --> B
   G -->|train| MODEL
@@ -38,10 +40,8 @@ flowchart LR
   FM --> APP
   DRIFT -->|readiness_drift| LB
 
-  subgraph Governance
-    UC[UC grants + PII tags]
-    RLS[care_unit scoping\nsecure views is_member · app-side fail-closed]
-  end
+  UC[UC grants + PII tags]
+  RLS[care_unit scoping<br/>secure views is_member · app-side fail-closed]
   UC -.governs.- G
   RLS -.governs.- G
   RLS -.governs.- APP
