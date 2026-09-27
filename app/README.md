@@ -19,6 +19,17 @@ Full output is in [`../EVIDENCE.md`](../EVIDENCE.md) / [`../evidence/raw/`](../e
 - **Genie Q&A**: *"How many current ICU patients are ready for step-down?"* → generated SQL → `ready=38, not_ready=2, total=40`.
 - **App RUNNING** at the deployed URL; Lakebase synced tables ONLINE; drift job PSI 2.15 / KS 0.22; unit-access scoped predicate → 15 MICU rows live.
 
+## 🔬 Data journey & Genie config (readable transformation logic)
+
+Full end-to-end medallion logic + Genie space config: **[`../DATA-JOURNEY.md`](../DATA-JOURNEY.md)**
+(source: [`../src/pipelines/`](../src/pipelines/) `bronze.sql`/`silver.sql`/`gold.sql`,
+[`../src/genie/space_config.md`](../src/genie/space_config.md)). In brief:
+
+- **Bronze**: Delta-shared MIMIC-III tables → UC materialized views (raw).
+- **Silver**: `chart_events` **unpivoted** to a long `vital_signs` stream via `CASE ITEMID → vital_name` (hr/sbp/dbp/spo2/temp_c/rr), °F→°C conversion, and physiologic range filters; `lab_events` gets an `is_lactate` flag.
+- **Gold `patient_features`** (one row/stay): a 24h window per stay → vitals `mean/min/max/last`; `on_vasopressors`/`on_ventilator` from intervention-table ITEMID sets (MetaVision ∪ CareVue); `lactate_last`; derived `recent_extubation` + `active_bleeding`; synthetic `care_unit`. → `readiness_training_set` (+ `readiness_label` = 72h bounce-back) and `census` (40 current).
+- **Genie space** exposes `gold.census`, `gold.readiness_training_set`, `silver.vital_signs` with text instructions (disambiguation, data-quality, aggregates-only) and 5 example queries; live Q&A in [`../evidence/raw/genie-qa.txt`](../evidence/raw/genie-qa.txt).
+
 ## 🛠️ Tech Stack
 
 This application leverages a powerful, modern tech stack:

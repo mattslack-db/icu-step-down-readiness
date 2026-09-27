@@ -19,6 +19,8 @@ Full readable run output is committed at **[`EVIDENCE.md`](EVIDENCE.md)** and, r
 - **Genie Q&A** over the governed tables: *"How many current ICU patients are ready for step-down?"* → generated SQL → `ready=38, not_ready=2, total=40`. ([`evidence/raw/genie-qa.txt`](evidence/raw/genie-qa.txt))
 - **Deployed app RUNNING** + Lakebase synced tables ONLINE; **drift job** PSI 2.15 / KS 0.22; **unit-access** scoped predicate returns 15 MICU rows live. ([`evidence/raw/app-deploy.txt`](evidence/raw/app-deploy.txt), [`evidence/raw/drift-run.txt`](evidence/raw/drift-run.txt), [`evidence/raw/unit-access-verification.txt`](evidence/raw/unit-access-verification.txt))
 
+**Want the transformation logic end to end?** The full bronze→silver→gold medallion SQL and the Genie space configuration are reproduced readably in **[`DATA-JOURNEY.md`](DATA-JOURNEY.md)** (source in [`src/pipelines/`](src/pipelines/) and [`src/genie/`](src/genie/)).
+
 ---
 
 ## The business problem
