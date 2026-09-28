@@ -26,8 +26,12 @@ Headline results, as committed text:
 
 ### For reviewers — submission map
 
+Every asset (deployed resource + repo artifact) with its identifier and proof is
+indexed in **[`VALIDATION.md`](VALIDATION.md)**.
+
 | Requirement | Where |
 |-------------|-------|
+| **Asset manifest** — every deployed resource + artifact, with proof | [`VALIDATION.md`](VALIDATION.md) |
 | **README** — what it does + how to run | this file (below) |
 | **BUILD.md** — workflow, AI tools/prompts, decisions, where AI was used | [`BUILD.md`](BUILD.md) |
 | **Execution evidence** — run outputs, notebook w/ outputs, test run | [`logs/`](logs/) (`.log`/`.csv`/`.json`/`.md`/`.ipynb`), [`EVIDENCE.md`](EVIDENCE.md), [`evidence/raw/`](evidence/raw/) |

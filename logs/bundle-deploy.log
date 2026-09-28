@@ -1,0 +1,34 @@
+# DABs bundle validate + summary — deployed asset manifest
+# Captured: 2026-09-28T06:47:52Z | target: sandbox | profile: icu-sandbox
+# Read-only (validate + summary); the app/pipeline/serving were deployed earlier this build.
+
+$ databricks bundle validate -t sandbox --profile icu-sandbox
+Name: icu_step_down
+Target: sandbox
+Workspace:
+  Host: https://fe-sandbox-icu-step-down-readiness.cloud.databricks.com
+  User: matt.slack@databricks.com
+  Path: /Workspace/Users/matt.slack@databricks.com/.bundle/icu_step_down/sandbox
+
+Validation OK!
+
+$ databricks bundle summary -t sandbox --profile icu-sandbox
+Name: icu_step_down
+Target: sandbox
+Workspace:
+  Host: https://fe-sandbox-icu-step-down-readiness.cloud.databricks.com
+  User: matt.slack@databricks.com
+  Path: /Workspace/Users/matt.slack@databricks.com/.bundle/icu_step_down/sandbox
+Resources:
+  Jobs:
+    icu_readiness_drift_check:
+      Name: icu-readiness-drift-check
+      URL:  (not deployed)
+  Model Serving Endpoints:
+    icu_readiness_endpoint:
+      Name: icu-readiness
+      URL:  https://fe-sandbox-icu-step-down-readiness.cloud.databricks.com/ml/endpoints/icu-readiness?w=7474646035095173
+  Pipelines:
+    icu_step_down_pipeline:
+      Name: icu-step-down-readiness-medallion
+      URL:  https://fe-sandbox-icu-step-down-readiness.cloud.databricks.com/pipelines/f216d643-ef34-425f-a09a-f1b797b55395?w=7474646035095173
