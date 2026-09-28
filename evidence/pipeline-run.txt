@@ -1,7 +1,7 @@
 # Lakeflow pipeline run — icu-step-down-readiness-medallion
 # Captured: 2026-09-25T22:03:44Z | profile: icu-sandbox | workspace: fe-sandbox-icu-step-down-readiness
 # Pipeline ID: f216d643-ef34-425f-a09a-f1b797b55395 | Update ID: a28ac017-be1b-4555-92f2-d3fa587c5e91
-# Full bronze->silver->gold rebuild after dropping orphaned tables (see evidence/raw/README.md).
+# Full bronze->silver->gold rebuild after dropping orphaned tables (see evidence/README.md).
 
 ## Update summary (COMPLETED)
 {"state":"COMPLETED","cause":"RETRY_ON_FAILURE","pipeline_id":"f216d643-ef34-425f-a09a-f1b797b55395","update_id":"a28ac017-be1b-4555-92f2-d3fa587c5e91"}

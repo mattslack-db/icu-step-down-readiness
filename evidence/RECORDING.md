@@ -16,9 +16,11 @@
 
 Live app URL: https://icu-step-down-7474645692590282.aws.databricksapps.com
 
-Static readable evidence of each of these is committed in [`../logs/`](../logs/),
-[`../EVIDENCE.md`](../EVIDENCE.md), and [`raw/`](raw/); app screenshots are in
-this folder (`screenshot-census.png`, `screenshot-analytics.png`,
+Static readable evidence of each of these is committed in this `evidence/`
+folder (`pipeline-run.log`, `query-results.csv`, `serving-prediction.json`,
+`genie-conversation.md`, `drift-metrics.csv`, `test-run.log`, …) and summarized
+in [`../EVIDENCE.md`](../EVIDENCE.md); app screenshots are in this folder
+(`screenshot-census.png`, `screenshot-analytics.png`,
 `screenshot-patient-detail.png`) — note the repo collector excludes binary
 images, so also attach the screenshots (and the deck PDF) directly in the
 submission.

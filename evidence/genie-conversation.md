@@ -3,7 +3,7 @@
 Captured 2026-09-25 via the Genie Conversation API (space
 `01f1b92aeef914e383e43c1452d294cf`, profile `icu-sandbox`). Each question →
 Genie-generated SQL → result rows. Full transcript (all 5 turns) in
-[`../evidence/raw/genie-qa.txt`](../evidence/raw/genie-qa.txt).
+[`genie-qa.txt`](genie-qa.txt).
 
 ---
 

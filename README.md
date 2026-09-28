@@ -10,17 +10,17 @@ An end-to-end Databricks data journey that helps ICU clinicians identify which p
 
 ## ✅ Proof this build actually ran (readable execution evidence)
 
-Committed run output lives in three places: the top-level **[`logs/`](logs/)** folder
-(multi-format — `.log`, `.csv`, `.json`, `.md`, and a **[notebook with cell outputs](logs/execution-evidence.ipynb)**),
-the narrative **[`EVIDENCE.md`](EVIDENCE.md)**, and the raw **[`evidence/raw/`](evidence/raw/)** captures.
+All committed run output lives in the top-level **[`evidence/`](evidence/)** folder
+(multi-format — `.log`, `.csv`, `.json`, `.txt`, `.md`, and **[notebooks with cell outputs](evidence/execution-evidence.ipynb)**),
+summarized in the narrative **[`EVIDENCE.md`](EVIDENCE.md)** and indexed in **[`VALIDATION.md`](VALIDATION.md)**.
 Headline results, as committed text:
 
-- **Lakeflow pipeline run — COMPLETED**, bronze→gold row counts: bronze `admissions 58,976` / `chart_events 38,776,289` / `lab_events 27,854,055` → gold `patient_features 61,532`, `readiness_training_set 61,532`, `census 40`. ([`evidence/raw/pipeline-run.txt`](evidence/raw/pipeline-run.txt))
-- **Query against governed gold tables:** census cohort n=40, avg LOS 2.83d, 8 on pressors / 11 on vent; training label balance 59,706 ready / 1,826 not-ready. ([`evidence/raw/gold-queries.txt`](evidence/raw/gold-queries.txt))
-- **Real served prediction** (Mosaic AI `icu-readiness`, model v2): `readiness_score 0.4739` with factors `lactate_last (risk 0.262)`, `on_ventilator (risk 0.030)`, … — `on_ventilator` shown as **risk** (safety override, live). ([`evidence/raw/serving-prediction.txt`](evidence/raw/serving-prediction.txt))
-- **Genie Q&A** over the governed tables: *"How many current ICU patients are ready for step-down?"* → generated SQL → `ready=38, not_ready=2, total=40`. ([`evidence/raw/genie-qa.txt`](evidence/raw/genie-qa.txt))
-- **Deployed app RUNNING** + Lakebase synced tables ONLINE; **drift job** PSI 2.15 / KS 0.22; **unit-access** scoped predicate returns 15 MICU rows live. ([`evidence/raw/app-deploy.txt`](evidence/raw/app-deploy.txt), [`evidence/raw/drift-run.txt`](evidence/raw/drift-run.txt), [`evidence/raw/unit-access-verification.txt`](evidence/raw/unit-access-verification.txt))
-- **Test suites passing:** 188 backend + 36 frontend + 18 monitoring/genai = **242 passing** (+17 live integration) — committed run output in [`logs/test-run.log`](logs/test-run.log).
+- **Lakeflow pipeline run — COMPLETED**, bronze→gold row counts: bronze `admissions 58,976` / `chart_events 38,776,289` / `lab_events 27,854,055` → gold `patient_features 61,532`, `readiness_training_set 61,532`, `census 40`. ([`evidence/pipeline-run.txt`](evidence/pipeline-run.txt))
+- **Query against governed gold tables:** census cohort n=40, avg LOS 2.83d, 8 on pressors / 11 on vent; training label balance 59,706 ready / 1,826 not-ready. ([`evidence/gold-queries.txt`](evidence/gold-queries.txt))
+- **Real served prediction** (Mosaic AI `icu-readiness`, model v2): `readiness_score 0.4739` with factors `lactate_last (risk 0.262)`, `on_ventilator (risk 0.030)`, … — `on_ventilator` shown as **risk** (safety override, live). ([`evidence/serving-prediction.txt`](evidence/serving-prediction.txt))
+- **Genie Q&A** over the governed tables: *"How many current ICU patients are ready for step-down?"* → generated SQL → `ready=38, not_ready=2, total=40`. ([`evidence/genie-qa.txt`](evidence/genie-qa.txt))
+- **Deployed app RUNNING** + Lakebase synced tables ONLINE; **drift job** PSI 2.15 / KS 0.22; **unit-access** scoped predicate returns 15 MICU rows live. ([`evidence/app-deploy.txt`](evidence/app-deploy.txt), [`evidence/drift-run.txt`](evidence/drift-run.txt), [`evidence/unit-access-verification.txt`](evidence/unit-access-verification.txt))
+- **Test suites passing:** 188 backend + 36 frontend + 18 monitoring/genai = **242 passing** (+17 live integration) — committed run output in [`evidence/test-run.log`](evidence/test-run.log).
 
 **Want the transformation logic end to end?** The full bronze→silver→gold medallion SQL and the Genie space configuration are reproduced readably in **[`DATA-JOURNEY.md`](DATA-JOURNEY.md)** (source in [`src/pipelines/`](src/pipelines/) and [`src/genie/`](src/genie/)).
 
@@ -34,7 +34,7 @@ indexed in **[`VALIDATION.md`](VALIDATION.md)**.
 | **Asset manifest** — every deployed resource + artifact, with proof | [`VALIDATION.md`](VALIDATION.md) |
 | **README** — what it does + how to run | this file (below) |
 | **BUILD.md** — workflow, AI tools/prompts, decisions, where AI was used | [`BUILD.md`](BUILD.md) |
-| **Execution evidence** — run outputs, notebook w/ outputs, test run | [`logs/`](logs/) (`.log`/`.csv`/`.json`/`.md`/`.ipynb`), [`EVIDENCE.md`](EVIDENCE.md), [`evidence/raw/`](evidence/raw/) |
+| **Execution evidence** — run outputs, notebooks w/ outputs, test run, deploy logs | [`evidence/`](evidence/) (`.log`/`.csv`/`.json`/`.txt`/`.md`/`.ipynb`) + narrative [`EVIDENCE.md`](EVIDENCE.md) |
 | **Architecture diagram** | [`evidence/architecture.md`](evidence/architecture.md) (Mermaid text — always collected) + [`evidence/architecture.png`](evidence/architecture.png) (rendered image) |
 | **Screenshots** (app / analytics / patient detail) | `evidence/screenshot-*.png` — **binary; attach separately** (repo collector excludes binaries) |
 | **Presentation** | [`deck/icu-step-down-readiness.pdf`](deck/icu-step-down-readiness.pdf) — **attach the PDF separately** (HTML alone not accepted; binaries excluded from repo scan) |
@@ -82,30 +82,30 @@ flowchart LR
 | Surface | Databricks App (React + FastAPI) | Census dashboard, patient detail, analytics | [07-app-api](evidence/07-app-api.md) · [07-app-deploy](evidence/07-app-deploy.md) |
 | Provision | FEVM + DABs | AWS serverless sandbox; all assets via Asset Bundles | [00-provisioning](evidence/00-provisioning.md) |
 | Data access | Delta Sharing | Cross-metastore D2D share of the source | [01-data-access](evidence/01-data-access.md) |
-| Tests | pytest + vitest | 188 backend + 36 frontend + 18 monitoring/genai (+17 live integration) — run output in [`logs/test-run.log`](logs/test-run.log) | [08-tests](evidence/08-tests.md) |
+| Tests | pytest + vitest | 188 backend + 36 frontend + 18 monitoring/genai (+17 live integration) — run output in [`evidence/test-run.log`](evidence/test-run.log) | [08-tests](evidence/08-tests.md) |
 
 All evidence files contain **committed, text-readable run output** (row counts, query results, model metrics, deploy logs) — not screenshots.
 
 ### ▶ Raw execution evidence (live-captured)
 
-The [`evidence/raw/`](evidence/raw/) directory holds **verbatim CLI/API output** from live runs against the sandbox (captured 2026-09-25) — proof the build actually executed, not transcribed summaries:
+The [`evidence/`](evidence/) directory holds **verbatim CLI/API output** from live runs against the sandbox (captured 2026-09-25) — proof the build actually executed, not transcribed summaries:
 
-- [`evidence/raw/gold-queries.txt`](evidence/raw/gold-queries.txt) — live SQL results against the governed `icu_step_down.gold.*` tables
-- [`evidence/raw/serving-prediction.txt`](evidence/raw/serving-prediction.txt) — real request/response from the `icu-readiness` Mosaic AI endpoint (`readiness_score` + SHAP factors)
-- [`evidence/raw/genie-qa.txt`](evidence/raw/genie-qa.txt) — five NL questions → generated SQL → result rows via the Genie Conversation API
-- [`evidence/raw/pipeline-run.txt`](evidence/raw/pipeline-run.txt) — Lakeflow pipeline run event log + bronze→silver→gold row counts
-- [`evidence/raw/lakebase-query.txt`](evidence/raw/lakebase-query.txt) — Lakebase synced tables ONLINE + row counts read from Postgres
-- [`evidence/raw/app-deploy.txt`](evidence/raw/app-deploy.txt) — Databricks App RUNNING + startup logs
+- [`evidence/gold-queries.txt`](evidence/gold-queries.txt) — live SQL results against the governed `icu_step_down.gold.*` tables
+- [`evidence/serving-prediction.txt`](evidence/serving-prediction.txt) — real request/response from the `icu-readiness` Mosaic AI endpoint (`readiness_score` + SHAP factors)
+- [`evidence/genie-qa.txt`](evidence/genie-qa.txt) — five NL questions → generated SQL → result rows via the Genie Conversation API
+- [`evidence/pipeline-run.txt`](evidence/pipeline-run.txt) — Lakeflow pipeline run event log + bronze→silver→gold row counts
+- [`evidence/lakebase-query.txt`](evidence/lakebase-query.txt) — Lakebase synced tables ONLINE + row counts read from Postgres
+- [`evidence/app-deploy.txt`](evidence/app-deploy.txt) — Databricks App RUNNING + startup logs
 
 Clinical-enhancement evidence (captured 2026-09-26):
 
-- [`evidence/raw/gold-derived-signals.txt`](evidence/raw/gold-derived-signals.txt) — prevalence of the derived guardrail signals `recent_extubation` / `active_bleeding` across the cohort and current census
-- [`evidence/raw/care-unit-distribution.txt`](evidence/raw/care-unit-distribution.txt) — synthetic `care_unit` (MICU/SICU/CCU) distribution over census and full cohort
-- [`evidence/raw/drift-run.txt`](evidence/raw/drift-run.txt) — live drift job run: PSI 2.15 / KS 0.22 (verdict `drift`) vs the training baseline
-- [`evidence/raw/drift-baseline.txt`](evidence/raw/drift-baseline.txt) — training-cohort score-decile baseline the drift check compares against
-- [`evidence/raw/unit-access-verification.txt`](evidence/raw/unit-access-verification.txt) — live read-only proof of the unit-access mechanism (captured 2026-09-27): group resolution via `current_user.me()`, `care_unit` on gold + the Lakebase read path, the scoped predicate, and the fail-closed governed view
+- [`evidence/gold-derived-signals.txt`](evidence/gold-derived-signals.txt) — prevalence of the derived guardrail signals `recent_extubation` / `active_bleeding` across the cohort and current census
+- [`evidence/care-unit-distribution.txt`](evidence/care-unit-distribution.txt) — synthetic `care_unit` (MICU/SICU/CCU) distribution over census and full cohort
+- [`evidence/drift-run.txt`](evidence/drift-run.txt) — live drift job run: PSI 2.15 / KS 0.22 (verdict `drift`) vs the training baseline
+- [`evidence/drift-baseline.txt`](evidence/drift-baseline.txt) — training-cohort score-decile baseline the drift check compares against
+- [`evidence/unit-access-verification.txt`](evidence/unit-access-verification.txt) — live read-only proof of the unit-access mechanism (captured 2026-09-27): group resolution via `current_user.me()`, `care_unit` on gold + the Lakebase read path, the scoped predicate, and the fail-closed governed view
 
-See [`evidence/raw/README.md`](evidence/raw/README.md) for the capture method and how to reproduce.
+See [`evidence/README.md`](evidence/README.md) for the capture method and how to reproduce.
 
 ---
 
@@ -146,7 +146,7 @@ databricks bundle deploy   -t sandbox --profile icu-sandbox   # pipeline, model 
 
 - **Pipeline:** run the `icu-step-down-readiness-medallion` Lakeflow pipeline to (re)build bronze→silver→gold.
 - **Lakebase sync:** `python src/lakebase/sync_tables.py` (idempotent).
-- **Tests:** `cd app && uv run pytest` (backend, **188**) · `cd app && bunx vitest run` (frontend, **36**) · `pytest tests/monitoring tests/genai` (monitoring/genai, **18**) · `pytest tests/integration -m integration` (pipeline, 17 — needs the `icu-sandbox` profile + `databricks-sql-connector`). Committed run output: [`logs/test-run.log`](logs/test-run.log).
+- **Tests:** `cd app && uv run pytest` (backend, **188**) · `cd app && bunx vitest run` (frontend, **36**) · `pytest tests/monitoring tests/genai` (monitoring/genai, **18**) · `pytest tests/integration -m integration` (pipeline, 17 — needs the `icu-sandbox` profile + `databricks-sql-connector`). Committed run output: [`evidence/test-run.log`](evidence/test-run.log).
 
 ## Governance
 

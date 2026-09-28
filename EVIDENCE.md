@@ -3,7 +3,7 @@
 This file embeds **verbatim, committed run output** from live executions against the
 Databricks sandbox `fe-sandbox-icu-step-down-readiness` (CLI profile `icu-sandbox`).
 It is readable text, not screenshots and not narrative description. The full raw
-captures live in [`evidence/raw/`](evidence/raw/); the key results are reproduced
+captures live in [`evidence/`](evidence/); the key results are reproduced
 inline here so the evidence is visible without descending into the tree.
 
 Layers proven: **Lakeflow pipeline → Unity Catalog gold → Mosaic AI serving →
@@ -35,7 +35,7 @@ gold     readiness_training_set   61,532
 gold     census                   40      (current ICU patients)
 ```
 
-Full event log (every flow `COMPLETED`, bronze→silver→gold): [`evidence/raw/pipeline-run.txt`](evidence/raw/pipeline-run.txt).
+Full event log (every flow `COMPLETED`, bronze→silver→gold): [`evidence/pipeline-run.txt`](evidence/pipeline-run.txt).
 
 ---
 
@@ -62,7 +62,7 @@ avg_age  avg_los_days  on_pressors  on_vent  patients
 54.8     2.83          8            11       40
 ```
 
-Full queries + sample feature rows: [`evidence/raw/gold-queries.txt`](evidence/raw/gold-queries.txt).
+Full queries + sample feature rows: [`evidence/gold-queries.txt`](evidence/gold-queries.txt).
 
 ---
 
@@ -87,7 +87,7 @@ Full queries + sample feature rows: [`evidence/raw/gold-queries.txt`](evidence/r
 ```
 
 Note `on_ventilator` is returned as **`"risk"`** — the always-flag-known-risks
-safety override, live. Full request + response: [`evidence/raw/serving-prediction.txt`](evidence/raw/serving-prediction.txt).
+safety override, live. Full request + response: [`evidence/serving-prediction.txt`](evidence/serving-prediction.txt).
 
 ---
 
@@ -112,7 +112,7 @@ JOIN icu_step_down.gold.readiness_training_set r ON c.icustay_id = r.icustay_id
 **Q5 — "What fraction of ICU stays had a bounce-back within 72 hours?"**
 → `bounce_back_pct=2.97, bounce_back_count=1826, total_stays=61532`
 
-All five Q&A with full SQL + rows: [`evidence/raw/genie-qa.txt`](evidence/raw/genie-qa.txt).
+All five Q&A with full SQL + rows: [`evidence/genie-qa.txt`](evidence/genie-qa.txt).
 
 ---
 
@@ -129,8 +129,8 @@ url:           https://icu-step-down-7474645692590282.aws.databricksapps.com
 ```
 
 Lakebase synced tables ONLINE (`census`, `patient_features`, `census_vitals`) with
-row counts read from Postgres: [`evidence/raw/lakebase-query.txt`](evidence/raw/lakebase-query.txt),
-[`evidence/raw/app-deploy.txt`](evidence/raw/app-deploy.txt).
+row counts read from Postgres: [`evidence/lakebase-query.txt`](evidence/lakebase-query.txt),
+[`evidence/app-deploy.txt`](evidence/app-deploy.txt).
 
 ---
 
@@ -138,14 +138,14 @@ row counts read from Postgres: [`evidence/raw/lakebase-query.txt`](evidence/raw/
 
 - **Model drift job** (live, SUCCESS): `PSI 2.1528 / KS 0.2205`, verdict `drift`,
   `n_live 40` vs the training baseline, scored via UC model `readiness_model/2` —
-  [`evidence/raw/drift-run.txt`](evidence/raw/drift-run.txt).
+  [`evidence/drift-run.txt`](evidence/drift-run.txt).
 - **Derived guardrail signals** `recent_extubation` / `active_bleeding` prevalence
-  across 61,532 stays — [`evidence/raw/gold-derived-signals.txt`](evidence/raw/gold-derived-signals.txt).
+  across 61,532 stays — [`evidence/gold-derived-signals.txt`](evidence/gold-derived-signals.txt).
 - **Unit-level access** (read-only, 2026-09-27): `current_user.me()` resolves the
   `icu_micu` group → scope `["MICU"]`; the scoped `WHERE care_unit IN ('MICU')`
   predicate returns **15 rows** on both `gold.census` and the Lakebase
   `mimic_iii.census` the app reads; the fail-closed `is_member()` governed view
-  returns MICU-only for a non-admin — [`evidence/raw/unit-access-verification.txt`](evidence/raw/unit-access-verification.txt).
+  returns MICU-only for a non-admin — [`evidence/unit-access-verification.txt`](evidence/unit-access-verification.txt).
 
 ---
 

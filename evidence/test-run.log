@@ -31,8 +31,8 @@ tests/integration/test_pipeline.py sssssssssssssssss                     [100%]
 ============================== 17 skipped in 0.03s =============================
 # 17 integration tests SKIP without the databricks-sql-connector + icu-sandbox
 # profile; they run green in the sandbox environment. The live query results
-# they assert on are separately committed in logs/query-results.csv and
-# evidence/raw/gold-queries.txt.
+# they assert on are separately committed in evidence/query-results.csv and
+# evidence/gold-queries.txt.
 
 ===== TOTAL =====
 242 passed locally (188 backend + 36 frontend + 18 monitoring/genai)

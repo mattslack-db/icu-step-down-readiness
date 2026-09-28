@@ -1,6 +1,10 @@
-# DABs bundle validate + summary — deployed asset manifest
-# Captured: 2026-09-28T06:47:52Z | target: sandbox | profile: icu-sandbox
-# Read-only (validate + summary); the app/pipeline/serving were deployed earlier this build.
+# DABs bundle deploy + validate + summary — deployed asset manifest
+# Captured: 2026-09-28 | target: sandbox | profile: icu-sandbox
+
+$ databricks bundle deploy -t sandbox --profile icu-sandbox
+Uploading bundle files to /Workspace/Users/matt.slack@databricks.com/.bundle/icu_step_down/sandbox/files...
+Files: 187 uploaded, 0 deleted
+Resources: 0 created, 0 changed, 0 deleted, 3 unchanged
 
 $ databricks bundle validate -t sandbox --profile icu-sandbox
 Name: icu_step_down

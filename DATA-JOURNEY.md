@@ -180,4 +180,4 @@ JOIN icu_step_down.gold.readiness_training_set r ON c.icustay_id = r.icustay_id;
 ```
 
 Live natural-language Q&A (question → generated SQL → rows) is captured in
-[`evidence/raw/genie-qa.txt`](evidence/raw/genie-qa.txt).
+[`evidence/genie-qa.txt`](evidence/genie-qa.txt).

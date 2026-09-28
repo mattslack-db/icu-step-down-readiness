@@ -1,7 +1,7 @@
 # BUILD.md — how this was built, with what AI, and why
 
 Companion to [`README.md`](README.md) (what it does + how to run) and
-[`EVIDENCE.md`](EVIDENCE.md) / [`logs/`](logs/) (proof it ran). This file covers
+[`EVIDENCE.md`](EVIDENCE.md) / [`evidence/`](evidence/) (proof it ran). This file covers
 the **build workflow, the AI tools and prompting approach, the key decisions and
 trade-offs, and where AI was vs. was not used.**
 
@@ -36,10 +36,10 @@ unit-level access control.
    checked by a separate reviewer subagent (spec compliance + code quality), with
    a fix loop, then a whole-branch review at the end. Progress tracked in a ledger.
 4. **TDD throughout**: tests written first; 188 backend + 36 frontend + 18
-   monitoring/genai pass (see [`logs/test-run.log`](logs/test-run.log)).
+   monitoring/genai pass (see [`evidence/test-run.log`](evidence/test-run.log)).
 5. **Live verification**: pipeline, serving, Genie, Lakebase, app, drift, and
    unit-access all exercised against the sandbox; verbatim output committed
-   (see [`EVIDENCE.md`](EVIDENCE.md), [`logs/`](logs/), [`evidence/raw/`](evidence/raw/)).
+   (see [`EVIDENCE.md`](EVIDENCE.md), [`evidence/`](evidence/), [`evidence/`](evidence/)).
 
 ### Prompting approach
 
