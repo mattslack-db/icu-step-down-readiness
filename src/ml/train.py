@@ -2,14 +2,19 @@
 # MAGIC %md
 # MAGIC # ICU Step-Down Readiness — LightGBM Training
 # MAGIC
-# MAGIC **Phase 5A (v2 — clean eval)** — train a binary classifier on
+# MAGIC **v3** — train a binary classifier on
 # MAGIC `icu_step_down.gold.readiness_training_set`, explain it with SHAP, wrap it in a
 # MAGIC MLflow pyfunc, and register to UC.
 # MAGIC
-# MAGIC | Label | Meaning | Count (approx) |
-# MAGIC |-------|---------|----------------|
-# MAGIC | 1 | Safe step-down (no ICU readmission in 72 h) | ~59,706 (97 %) |
-# MAGIC | 0 | Bounce-back (ICU readmission within 72 h) | ~1,826 (3 %) |
+# MAGIC | Label | Meaning |
+# MAGIC |-------|---------|
+# MAGIC | 1 | Safe step-down: left the ICU alive, no readmission or death within 72 h |
+# MAGIC | 0 | Not safe: ICU readmission **or death** within 72 h (v2 counted deaths as safe) |
+# MAGIC
+# MAGIC v3 also reports (a) a baseline trained on the v2 feature set with the v3
+# MAGIC label — isolating the label fix from the new features — and (b) AUC on the
+# MAGIC readmission-only subset (deaths excluded), so the headline isn't carried by
+# MAGIC mortality alone.
 # MAGIC
 # MAGIC **Class imbalance**: `class_weight="balanced"` — minority bounce-back class
 # MAGIC receives proportionally higher gradient weight.
@@ -28,6 +33,11 @@
 
 # COMMAND ----------
 
+# MAGIC %pip install -q "lightgbm>=4.0.0" "shap>=0.45.0"
+# MAGIC %restart_python
+
+# COMMAND ----------
+
 import json
 import os
 import shutil
@@ -41,7 +51,8 @@ import numpy as np
 import pandas as pd
 import shap
 from lightgbm import LGBMClassifier
-from mlflow.models import infer_signature
+from mlflow.models import ModelSignature
+from mlflow.types.schema import ColSpec, Schema
 from mlflow.tracking import MlflowClient
 from sklearn.metrics import (
     average_precision_score,
@@ -62,8 +73,9 @@ ENDPOINT_NAME = "icu-readiness"
 
 USER_EMAIL = spark.sql("SELECT current_user()").collect()[0][0]
 EXPERIMENT_BASE = f"/Users/{USER_EMAIL}/icu_step_down"
-# model.py is uploaded alongside this notebook — access via the /Workspace/ mount.
-MODEL_PY_PATH = f"/Workspace/Users/{USER_EMAIL}/icu_step_down/model.py"
+# model.py sits next to this notebook (bundle-synced src/ml/); notebooks run
+# with their own directory as the working directory.
+MODEL_PY_PATH = os.path.abspath("model.py")
 
 print(f"MLflow experiment : {EXPERIMENT_BASE}/training")
 print(f"Target model      : {FULL_MODEL_NAME}")
@@ -71,6 +83,8 @@ print(f"pyfunc model.py   : {MODEL_PY_PATH}")
 print(f"model.py exists   : {os.path.exists(MODEL_PY_PATH)}")
 
 mlflow.set_registry_uri("databricks-uc")
+# The experiment's parent folder must exist (fresh workspaces don't have it).
+os.makedirs(f"/Workspace{EXPERIMENT_BASE}", exist_ok=True)
 mlflow.set_experiment(f"{EXPERIMENT_BASE}/training")
 
 # COMMAND ----------
@@ -80,7 +94,7 @@ mlflow.set_experiment(f"{EXPERIMENT_BASE}/training")
 
 # COMMAND ----------
 
-FEATURE_COLS = [
+FEATURE_COLS_V2 = [
     "hr_mean", "hr_min", "hr_max", "hr_last",
     "sbp_mean", "sbp_min", "sbp_max", "sbp_last",
     "dbp_mean", "dbp_min", "dbp_max", "dbp_last",
@@ -90,15 +104,32 @@ FEATURE_COLS = [
     "on_vasopressors", "on_ventilator",
     "gcs_last", "lactate_last", "los", "age",
 ]
+# Must match src/ml/model.py FEATURE_COLS exactly (enforced by tests/ml).
+FEATURE_COLS = FEATURE_COLS_V2 + [
+    "hr_std", "sbp_std", "rr_std", "spo2_std", "n_vital_obs",
+    "creatinine_last", "bun_last", "wbc_last", "hemoglobin_last",
+    "platelets_last", "bicarbonate_last", "sodium_last", "potassium_last",
+    "glucose_last",
+    "urine_output_24h", "vasopressors_24h", "ventilated_24h",
+    "prior_icu_stays", "is_emergency_admit", "hours_admit_to_icu",
+    "is_surgical_unit", "is_cardiac_unit", "is_male",
+]
 TARGET_COL = "readiness_label"
 KEY_COLS = ["subject_id", "hadm_id", "icustay_id"]  # never used as features
 
-df = spark.table(f"{CATALOG}.gold.readiness_training_set").toPandas()
+# Sort before splitting: Spark row order is not stable across reads, and the
+# stratified split is order-dependent, so an unsorted frame gives slightly
+# different metrics run-to-run on identical data.
+df = (
+    spark.table(f"{CATALOG}.gold.readiness_training_set").toPandas()
+    .sort_values("icustay_id", key=lambda s: pd.to_numeric(s, errors="coerce"))
+    .reset_index(drop=True)
+)
 print(f"Loaded {len(df):,} rows")
 
 # Coerce all feature columns to numeric.
 # Many are stored as STRING in the Delta table; pd.to_numeric preserves NaN.
-for col in FEATURE_COLS:
+for col in FEATURE_COLS:  # superset of FEATURE_COLS_V2
     dtype_str = str(df[col].dtype)
     if dtype_str in ("object", "string", "StringDtype", "boolean"):
         df[col] = pd.to_numeric(df[col], errors="coerce")
@@ -118,17 +149,23 @@ print(f"\nNaN counts per feature (top 10):\n"
 
 # COMMAND ----------
 
-X = df[FEATURE_COLS]
-y = df[TARGET_COL]
-
+# Split whole rows so label_reason stays aligned with the test set.
 # Step 1: carve off 20 % test set (untouched until final evaluation).
-X_trainval, X_test, y_trainval, y_test = train_test_split(
-    X, y, test_size=0.20, random_state=42, stratify=y
+df_trainval, df_test = train_test_split(
+    df, test_size=0.20, random_state=42, stratify=df[TARGET_COL]
 )
 # Step 2: split remainder 80/20 → train 64 % / val 16 % of total.
-X_train, X_val, y_train, y_val = train_test_split(
-    X_trainval, y_trainval, test_size=0.20, random_state=42, stratify=y_trainval
+df_train, df_val = train_test_split(
+    df_trainval, test_size=0.20, random_state=42, stratify=df_trainval[TARGET_COL]
 )
+
+X_train, y_train = df_train[FEATURE_COLS], df_train[TARGET_COL]
+X_val, y_val = df_val[FEATURE_COLS], df_val[TARGET_COL]
+X_test, y_test = df_test[FEATURE_COLS], df_test[TARGET_COL]
+
+# Readmission-only view of TEST: drop deaths so AUC measures bounce-back vs safe.
+readmit_mask = (df_test["label_reason"] != "death").to_numpy()
+print(f"\nTest label_reason breakdown:\n{df_test['label_reason'].value_counts()}")
 
 print(f"Train : {len(X_train):,} rows | label=1: {y_train.mean()*100:.1f}%")
 print(f"Val   : {len(X_val):,} rows  | label=1: {y_val.mean()*100:.1f}%")
@@ -157,7 +194,20 @@ lgbm_params = {
     "verbose": -1,
 }
 
-with mlflow.start_run(run_name="lgbm_readiness_v2") as run:
+def fit_lgbm(cols: list[str]) -> LGBMClassifier:
+    """Fit on TRAIN with early stopping on VAL for the given feature columns."""
+    model = LGBMClassifier(**lgbm_params)
+    model.fit(
+        df_train[cols],
+        y_train,
+        eval_set=[(df_val[cols], y_val)],   # VAL only — test set not touched here
+        eval_metric="auc",
+        callbacks=[lgb.early_stopping(50, verbose=False), lgb.log_evaluation(period=-1)],
+    )
+    return model
+
+
+with mlflow.start_run(run_name="lgbm_readiness_v3") as run:
     mlflow.log_params(lgbm_params)
     mlflow.log_param("feature_count", len(FEATURE_COLS))
     mlflow.log_param("train_size", len(X_train))
@@ -167,15 +217,15 @@ with mlflow.start_run(run_name="lgbm_readiness_v2") as run:
     mlflow.log_param("nan_strategy", "passthrough_lgbm_native")
     mlflow.log_param("class_imbalance_strategy", "class_weight_balanced")
 
-    # ── Train (early stopping on VAL) ────────────────────────────────────────
-    clf = LGBMClassifier(**lgbm_params)
-    clf.fit(
-        X_train,
-        y_train,
-        eval_set=[(X_val, y_val)],   # VAL only — test set not touched here
-        eval_metric="auc",
-        callbacks=[lgb.early_stopping(50, verbose=False), lgb.log_evaluation(period=-1)],
-    )
+    mlflow.log_param("label_definition", "v3: not safe = readmission OR death within 72h")
+
+    # ── Baseline: v2 feature set on the v3 label (isolates the label fix) ────
+    baseline = fit_lgbm(FEATURE_COLS_V2)
+    baseline_prob = baseline.predict_proba(X_test[FEATURE_COLS_V2])[:, 1]
+    auc_baseline_v2_features = roc_auc_score(y_test, baseline_prob)
+
+    # ── Train v3 (early stopping on VAL) ─────────────────────────────────────
+    clf = fit_lgbm(FEATURE_COLS)
     print(f"Best iteration: {clf.best_iteration_}")
     mlflow.log_param("best_iteration", clf.best_iteration_)
 
@@ -184,6 +234,7 @@ with mlflow.start_run(run_name="lgbm_readiness_v2") as run:
     y_pred = (y_prob >= 0.5).astype(int)
 
     auc = roc_auc_score(y_test, y_prob)
+    auc_readmission_only = roc_auc_score(y_test[readmit_mask], y_prob[readmit_mask])
     pr_auc_label1 = average_precision_score(y_test, y_prob)
     pr_auc_label0 = average_precision_score(y_test, 1 - y_prob, pos_label=0)  # bounce-back minority
     prec1, rec1, f1_1, _ = precision_recall_fscore_support(
@@ -196,6 +247,8 @@ with mlflow.start_run(run_name="lgbm_readiness_v2") as run:
 
     mlflow.log_metrics({
         "test_auc": auc,
+        "test_auc_readmission_only": auc_readmission_only,
+        "test_auc_baseline_v2_features": auc_baseline_v2_features,
         "test_pr_auc_label1": pr_auc_label1,
         "test_pr_auc_label0": pr_auc_label0,
         "test_precision_label1": prec1,
@@ -208,6 +261,8 @@ with mlflow.start_run(run_name="lgbm_readiness_v2") as run:
 
     print(f"\n=== Metrics (clean held-out test set) ===")
     print(f"AUC:                  {auc:.4f}")
+    print(f"AUC readmission-only: {auc_readmission_only:.4f}  (deaths excluded from TEST)")
+    print(f"AUC baseline (v2 features, v3 label): {auc_baseline_v2_features:.4f}")
     print(f"PR-AUC (label=1):     {pr_auc_label1:.4f}  (majority safe class — see note)")
     print(f"PR-AUC (label=0):     {pr_auc_label0:.4f}  (bounce-back detection — clinically meaningful)")
     print(f"Precision(L=1): {prec1:.4f}   Recall(L=1): {rec1:.4f}   F1(L=1): {f1_1:.4f}")
@@ -253,14 +308,15 @@ with mlflow.start_run(run_name="lgbm_readiness_v2") as run:
         "Upload src/ml/model.py to the workspace before running this notebook."
     )
 
-    sample_in = X_test.head(3).copy()
-    sample_out = pd.DataFrame({
-        "prediction": [
-            json.dumps({"readiness_score": 0.95,
-                        "factors": [{"name": "los", "direction": "supports", "magnitude": 0.3}]}),
-        ] * 3
-    })
-    sig = infer_signature(sample_in, sample_out)
+    # Explicit signature: every feature is an OPTIONAL double. Inferring it
+    # from a 3-row sample (v2/v3) marked columns with no nulls in those rows
+    # as required and integer counts as long — so a census patient with a
+    # missing lab, or an int-typed count, was rejected at serving time.
+    sig = ModelSignature(
+        inputs=Schema([ColSpec("double", c, required=False) for c in FEATURE_COLS]),
+        outputs=Schema([ColSpec("string", "prediction")]),
+    )
+    sample_in = X_test.head(3).astype("float64")
 
     pip_reqs = [
         "mlflow",
@@ -299,7 +355,7 @@ with mlflow.start_run(run_name="lgbm_readiness_v2") as run:
 
 model_uri = f"models:/{FULL_MODEL_NAME}@prod"
 pyfunc_model = mlflow.pyfunc.load_model(model_uri)
-sample_rows = X_test.head(3)
+sample_rows = X_test.head(3).astype("float64")  # signature: all features double
 pyfunc_out = pyfunc_model.predict(sample_rows)
 print("Sample pyfunc output:")
 for i, row in pyfunc_out.iterrows():
@@ -319,6 +375,9 @@ output = {
     "model_version": str(registered_version),
     "model_uri": model_uri,
     "test_auc": round(auc, 4),
+    "test_auc_readmission_only": round(auc_readmission_only, 4),
+    "test_auc_baseline_v2_features": round(auc_baseline_v2_features, 4),
+    "test_label_reason_counts": df_test["label_reason"].value_counts().to_dict(),
     "test_pr_auc_label1": round(pr_auc_label1, 4),
     "test_pr_auc_label0": round(pr_auc_label0, 4),
     "test_f1_label0": round(f1_0, 4),

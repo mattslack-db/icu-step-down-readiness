@@ -93,17 +93,16 @@ class TestHistoryTableDDL:
 
 
 _KNOWN_TAIL = [
-    "on_vasopressors", "on_ventilator",
-    "gcs_last", "lactate_last", "los", "age",
+    "hours_admit_to_icu", "is_surgical_unit", "is_cardiac_unit", "is_male",
 ]
 _KNOWN_HEAD = ["hr_mean", "hr_min", "hr_max", "hr_last"]
 
 
 class TestFeatureColsGuard:
-    def test_feature_cols_length_is_30(self) -> None:
-        """_FEATURE_COLS must have exactly 30 entries (matching FEATURE_COLS in model.py)."""
-        assert len(_FEATURE_COLS) == 30, (
-            f"_FEATURE_COLS has {len(_FEATURE_COLS)} entries; expected 30. "
+    def test_feature_cols_length_is_53(self) -> None:
+        """_FEATURE_COLS must have exactly 53 entries (v3; matching FEATURE_COLS in model.py)."""
+        assert len(_FEATURE_COLS) == 53, (
+            f"_FEATURE_COLS has {len(_FEATURE_COLS)} entries; expected 53. "
             "Update baseline._FEATURE_COLS to match src/ml/model.py:FEATURE_COLS."
         )
 
@@ -116,8 +115,8 @@ class TestFeatureColsGuard:
 
     def test_feature_cols_tail_matches_model(self) -> None:
         """Last six entries must match the known tail of FEATURE_COLS."""
-        assert list(_FEATURE_COLS[-6:]) == _KNOWN_TAIL, (
-            f"Tail mismatch: {_FEATURE_COLS[-6:]!r} != {_KNOWN_TAIL!r}. "
+        assert list(_FEATURE_COLS[-4:]) == _KNOWN_TAIL, (
+            f"Tail mismatch: {_FEATURE_COLS[-4:]!r} != {_KNOWN_TAIL!r}. "
             "Keep baseline._FEATURE_COLS in sync with src/ml/model.py:FEATURE_COLS."
         )
 
@@ -169,6 +168,29 @@ class TestCoerceFeatureFrame:
         result = _coerce_feature_frame(df)
         assert str(result["lactate_last"].dtype) == "float64"
         assert list(result["lactate_last"]) == pytest.approx([1.5, 2.5])
+
+    def test_int_column_becomes_float64(self) -> None:
+        """Integer counts (e.g. n_vital_obs, prior_icu_stays) are cast to float64.
+        MLflow will not 'safely' convert int64 → float64 during signature enforcement."""
+        df = pd.DataFrame({"n_vital_obs": [12, 40], "prior_icu_stays": [0, 2]})
+        result = _coerce_feature_frame(df)
+        assert str(result["n_vital_obs"].dtype) == "float64"
+        assert str(result["prior_icu_stays"].dtype) == "float64"
+        assert list(result["n_vital_obs"]) == pytest.approx([12.0, 40.0])
+
+    def test_decimal_and_string_numbers_become_float64(self) -> None:
+        """DECIMAL (object of Decimal) and numeric strings from Delta become float64; NULL → NaN."""
+        from decimal import Decimal
+
+        df = pd.DataFrame({
+            "hours_admit_to_icu": [Decimal("1.5"), None],
+            "hr_min": ["66", None],
+        })
+        result = _coerce_feature_frame(df)
+        assert str(result["hours_admit_to_icu"].dtype) == "float64"
+        assert str(result["hr_min"].dtype) == "float64"
+        assert result["hr_min"].iloc[0] == pytest.approx(66.0)
+        assert pd.isna(result["hr_min"].iloc[1])
 
     def test_input_frame_is_not_mutated(self) -> None:
         """The original DataFrame must not be modified (immutability)."""

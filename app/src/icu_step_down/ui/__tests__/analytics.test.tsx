@@ -2,8 +2,9 @@
  * Frontend tests for the Analytics view (routes/analytics.tsx).
  *
  * Covers:
- * - AUC-ROC of 0.66 is displayed as the headline model quality metric
- * - PR-AUC of 0.98 is present but clearly labeled as misleading / majority-class artifact
+ * - AUC-ROC of 0.89 (v6) is the headline metric, shown next to the 0.63
+ *   readmission-only AUC so the gain from the death-aware label is not hidden
+ * - Not-safe PR-AUC of 0.78 is shown as the clinically meaningful precision metric
  * - Band distribution chart renders
  * - Feature importance chart renders
  */
@@ -82,24 +83,24 @@ describe("AnalyticsContent — analytics view", () => {
     ).toBeInTheDocument();
   });
 
-  it("renders AUC-ROC 0.66 as the primary model quality metric", () => {
+  it("renders AUC-ROC 0.89 as the primary model quality metric", () => {
     renderAnalytics();
-    // The AUC-ROC value 0.66 must be visible
-    expect(screen.getByText("0.66")).toBeInTheDocument();
+    expect(screen.getByText("0.89")).toBeInTheDocument();
     // "AUC-ROC" label appears at least once (label in card + footer)
     expect(screen.getAllByText(/auc-roc/i).length).toBeGreaterThan(0);
-    // Annotated with its limitation (may appear in card + footer)
-    expect(screen.getAllByText(/modest discrimination/i).length).toBeGreaterThan(0);
   });
 
-  it("renders PR-AUC 0.98 labeled as misleading — not as headline quality", () => {
+  it("shows readmission-only AUC 0.63 alongside the headline — gain is not overstated", () => {
     renderAnalytics();
-    // PR-AUC value present
-    expect(screen.getByText("0.98")).toBeInTheDocument();
-    // Explicitly labeled as misleading (not as headline metric)
-    expect(screen.getAllByText(/misleading/i).length).toBeGreaterThan(0);
-    // The explanation notes class imbalance (may appear multiple times)
-    expect(screen.getAllByText(/class imbalance/i).length).toBeGreaterThan(0);
+    expect(screen.getByText("0.63")).toBeInTheDocument();
+    expect(screen.getAllByText(/readmission-only/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/death/i).length).toBeGreaterThan(0);
+  });
+
+  it("renders the not-safe PR-AUC 0.78 as the precision metric", () => {
+    renderAnalytics();
+    expect(screen.getByText("0.78")).toBeInTheDocument();
+    expect(screen.getAllByText(/not-safe pr-auc/i).length).toBeGreaterThan(0);
   });
 
   it("renders the Honest Assessment framing card", () => {

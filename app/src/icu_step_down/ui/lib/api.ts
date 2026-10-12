@@ -12,25 +12,9 @@ export class ApiError extends Error {
         this.body = body;
     }
 }
-export interface DriftStatus {
-    /** Population Stability Index — ~0 for stable, >0.25 indicates drift. */
-    psi: number;
-    /** Kolmogorov-Smirnov statistic — max CDF gap between baseline and live.
-     *  null when the KS row has not yet been written (graceful degradation). */
-    ks: number | null;
-    /** One of: 'insufficient', 'stable', 'moderate', 'drift'. */
-    verdict: string;
-    /** Number of live scores used in this drift check. */
-    n_live: number;
-    /** Model version the baseline was computed against. */
-    model_version: string;
-    /** ISO-8601 UTC timestamp of the drift check run. */
-    computed_at: string;
-}
 export interface AnalyticsResponse {
     avg_los_by_band: Record<string, number>;
     band_distribution: BandCount[];
-    /** Drift-check result — null when the drift job has not yet run. */
     drift_status?: DriftStatus | null;
     feature_importance: FeatureImportanceItem[];
     generated_at: string;
@@ -71,6 +55,14 @@ export interface ComplexValue {
     ref?: string | null;
     type?: string | null;
     value?: string | null;
+}
+export interface DriftStatus {
+    computed_at: string;
+    ks?: number | null;
+    model_version: string;
+    n_live: number;
+    psi: number;
+    verdict: string;
 }
 export interface FactorOut {
     direction: string;
@@ -154,12 +146,41 @@ export interface VitalPoint {
     value: number;
     vital_name: string;
 }
-export const getAnalytics = async (options?: RequestInit): Promise<{
+export interface GetAnalyticsParams {
+    "X-Forwarded-Host"?: string | null;
+    "X-Forwarded-Preferred-Username"?: string | null;
+    "X-Forwarded-User"?: string | null;
+    "X-Forwarded-Email"?: string | null;
+    "X-Request-Id"?: string | null;
+    "X-Forwarded-Access-Token"?: string | null;
+}
+export const getAnalytics = async (params?: GetAnalyticsParams, options?: RequestInit): Promise<{
     data: AnalyticsResponse;
 }> =>{
     const res = await fetch("/api/analytics", {
         ...options,
-        method: "GET"
+        method: "GET",
+        headers: {
+            ...(params?.["X-Forwarded-Host"] != null && {
+                "X-Forwarded-Host": params["X-Forwarded-Host"]
+            }),
+            ...(params?.["X-Forwarded-Preferred-Username"] != null && {
+                "X-Forwarded-Preferred-Username": params["X-Forwarded-Preferred-Username"]
+            }),
+            ...(params?.["X-Forwarded-User"] != null && {
+                "X-Forwarded-User": params["X-Forwarded-User"]
+            }),
+            ...(params?.["X-Forwarded-Email"] != null && {
+                "X-Forwarded-Email": params["X-Forwarded-Email"]
+            }),
+            ...(params?.["X-Request-Id"] != null && {
+                "X-Request-Id": params["X-Request-Id"]
+            }),
+            ...(params?.["X-Forwarded-Access-Token"] != null && {
+                "X-Forwarded-Access-Token": params["X-Forwarded-Access-Token"]
+            }),
+            ...options?.headers
+        }
     });
     if (!res.ok) {
         const body = await res.text();
@@ -175,43 +196,75 @@ export const getAnalytics = async (options?: RequestInit): Promise<{
         data: await res.json()
     };
 };
-export const getAnalyticsKey = ()=>{
+export const getAnalyticsKey = (params?: GetAnalyticsParams)=>{
     return [
-        "/api/analytics"
+        "/api/analytics",
+        params
     ] as const;
 };
 export function useGetAnalytics<TData = {
     data: AnalyticsResponse;
 }>(options?: {
+    params?: GetAnalyticsParams;
     query?: Omit<UseQueryOptions<{
         data: AnalyticsResponse;
     }, ApiError, TData>, "queryKey" | "queryFn">;
 }) {
     return useQuery({
-        queryKey: getAnalyticsKey(),
-        queryFn: ()=>getAnalytics(),
+        queryKey: getAnalyticsKey(options?.params),
+        queryFn: ()=>getAnalytics(options?.params),
         ...options?.query
     });
 }
 export function useGetAnalyticsSuspense<TData = {
     data: AnalyticsResponse;
 }>(options?: {
+    params?: GetAnalyticsParams;
     query?: Omit<UseSuspenseQueryOptions<{
         data: AnalyticsResponse;
     }, ApiError, TData>, "queryKey" | "queryFn">;
 }) {
     return useSuspenseQuery({
-        queryKey: getAnalyticsKey(),
-        queryFn: ()=>getAnalytics(),
+        queryKey: getAnalyticsKey(options?.params),
+        queryFn: ()=>getAnalytics(options?.params),
         ...options?.query
     });
 }
-export const getCensus = async (options?: RequestInit): Promise<{
+export interface GetCensusParams {
+    "X-Forwarded-Host"?: string | null;
+    "X-Forwarded-Preferred-Username"?: string | null;
+    "X-Forwarded-User"?: string | null;
+    "X-Forwarded-Email"?: string | null;
+    "X-Request-Id"?: string | null;
+    "X-Forwarded-Access-Token"?: string | null;
+}
+export const getCensus = async (params?: GetCensusParams, options?: RequestInit): Promise<{
     data: CensusResponse;
 }> =>{
     const res = await fetch("/api/census", {
         ...options,
-        method: "GET"
+        method: "GET",
+        headers: {
+            ...(params?.["X-Forwarded-Host"] != null && {
+                "X-Forwarded-Host": params["X-Forwarded-Host"]
+            }),
+            ...(params?.["X-Forwarded-Preferred-Username"] != null && {
+                "X-Forwarded-Preferred-Username": params["X-Forwarded-Preferred-Username"]
+            }),
+            ...(params?.["X-Forwarded-User"] != null && {
+                "X-Forwarded-User": params["X-Forwarded-User"]
+            }),
+            ...(params?.["X-Forwarded-Email"] != null && {
+                "X-Forwarded-Email": params["X-Forwarded-Email"]
+            }),
+            ...(params?.["X-Request-Id"] != null && {
+                "X-Request-Id": params["X-Request-Id"]
+            }),
+            ...(params?.["X-Forwarded-Access-Token"] != null && {
+                "X-Forwarded-Access-Token": params["X-Forwarded-Access-Token"]
+            }),
+            ...options?.headers
+        }
     });
     if (!res.ok) {
         const body = await res.text();
@@ -227,34 +280,37 @@ export const getCensus = async (options?: RequestInit): Promise<{
         data: await res.json()
     };
 };
-export const getCensusKey = ()=>{
+export const getCensusKey = (params?: GetCensusParams)=>{
     return [
-        "/api/census"
+        "/api/census",
+        params
     ] as const;
 };
 export function useGetCensus<TData = {
     data: CensusResponse;
 }>(options?: {
+    params?: GetCensusParams;
     query?: Omit<UseQueryOptions<{
         data: CensusResponse;
     }, ApiError, TData>, "queryKey" | "queryFn">;
 }) {
     return useQuery({
-        queryKey: getCensusKey(),
-        queryFn: ()=>getCensus(),
+        queryKey: getCensusKey(options?.params),
+        queryFn: ()=>getCensus(options?.params),
         ...options?.query
     });
 }
 export function useGetCensusSuspense<TData = {
     data: CensusResponse;
 }>(options?: {
+    params?: GetCensusParams;
     query?: Omit<UseSuspenseQueryOptions<{
         data: CensusResponse;
     }, ApiError, TData>, "queryKey" | "queryFn">;
 }) {
     return useSuspenseQuery({
-        queryKey: getCensusKey(),
-        queryFn: ()=>getCensus(),
+        queryKey: getCensusKey(options?.params),
+        queryFn: ()=>getCensus(options?.params),
         ...options?.query
     });
 }
@@ -344,13 +400,40 @@ export function useCurrentUserSuspense<TData = {
 }
 export interface GetPatientParams {
     icustay_id: string;
+    "X-Forwarded-Host"?: string | null;
+    "X-Forwarded-Preferred-Username"?: string | null;
+    "X-Forwarded-User"?: string | null;
+    "X-Forwarded-Email"?: string | null;
+    "X-Request-Id"?: string | null;
+    "X-Forwarded-Access-Token"?: string | null;
 }
 export const getPatient = async (params: GetPatientParams, options?: RequestInit): Promise<{
     data: PatientDetail;
 }> =>{
     const res = await fetch(`/api/patients/${params.icustay_id}`, {
         ...options,
-        method: "GET"
+        method: "GET",
+        headers: {
+            ...(params?.["X-Forwarded-Host"] != null && {
+                "X-Forwarded-Host": params["X-Forwarded-Host"]
+            }),
+            ...(params?.["X-Forwarded-Preferred-Username"] != null && {
+                "X-Forwarded-Preferred-Username": params["X-Forwarded-Preferred-Username"]
+            }),
+            ...(params?.["X-Forwarded-User"] != null && {
+                "X-Forwarded-User": params["X-Forwarded-User"]
+            }),
+            ...(params?.["X-Forwarded-Email"] != null && {
+                "X-Forwarded-Email": params["X-Forwarded-Email"]
+            }),
+            ...(params?.["X-Request-Id"] != null && {
+                "X-Request-Id": params["X-Request-Id"]
+            }),
+            ...(params?.["X-Forwarded-Access-Token"] != null && {
+                "X-Forwarded-Access-Token": params["X-Forwarded-Access-Token"]
+            }),
+            ...options?.headers
+        }
     });
     if (!res.ok) {
         const body = await res.text();

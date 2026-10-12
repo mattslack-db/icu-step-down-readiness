@@ -34,3 +34,44 @@ resources:
 
       # Retry once on transient failures (e.g. Lakebase connectivity)
       max_concurrent_runs: 1
+
+    icu_readiness_train:
+      name: icu-readiness-train
+      description: >
+        Trains the LightGBM readiness model from gold.readiness_training_set,
+        evaluates once on a held-out test set (plus readmission-only and v2-
+        feature baselines), and registers a new UC model version with @prod.
+        Run on demand; serving is pinned to an explicit version in
+        model_serving.yml, so registering does not change what is served.
+      tasks:
+        - task_key: train
+          notebook_task:
+            notebook_path: ../src/ml/train.py
+          timeout_seconds: 3600
+      max_concurrent_runs: 1
+
+    icu_live_vitals_replay:
+      name: icu-live-vitals-replay
+      description: >
+        Live feed for the continuous pipeline: releases the next hour of the
+        live cohort's held-back MIMIC-III chart events into
+        landing.chart_events_feed (src/streaming/replay_vitals.py), then
+        refreshes the Lakebase census syncs. First run releases 12h; each
+        later run 1h; no-ops once the 24h window is fully replayed.
+      tasks:
+        - task_key: replay
+          spark_python_task:
+            python_file: ../src/streaming/replay_vitals.py
+            parameters: ["--initial-hours", "12", "--step-hours", "1"]
+          environment_key: replay_env
+          timeout_seconds: 600
+      environments:
+        - environment_key: replay_env
+          spec:
+            client: "3"
+            dependencies: []
+      schedule:
+        quartz_cron_expression: "0 0/5 * * * ?"   # every 5 min → 24h window replayed in ~1h
+        timezone_id: UTC
+        pause_status: PAUSED                     # unpause to start a live demo
+      max_concurrent_runs: 1

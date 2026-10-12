@@ -26,6 +26,7 @@ from sqlmodel import text
 from ..core.dependencies import Dependencies
 from ..lib import access
 from ..lib.feature_labels import FEATURE_LABELS
+from ..lib.guardrails import cap_band
 from ..lib.readiness import compute_readiness_index, readiness_band_from_index
 from ..models import (
     AnalyticsResponse,
@@ -44,22 +45,23 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api", tags=["analytics"])
 
 # ---------------------------------------------------------------------------
-# Global feature importance from v2 model evaluation (evidence/05-ml-metrics.md).
-# Mean |SHAP| values on held-out test set (n=500 sample).
+# Global feature importance from v6 model evaluation (evidence/05-ml-metrics.md).
+# Mean |SHAP| values on held-out test set (n=500 sample), MLflow run
+# b20ebd538eb74184b139ea061b292506 (shap_global_importance.csv).
 # These are fixed — the model version is pinned.
 # ---------------------------------------------------------------------------
 
 _GLOBAL_FEATURE_IMPORTANCE: list[tuple[str, float]] = [
-    ("lactate_last", 0.24580),
-    ("age", 0.04620),
-    ("los", 0.03491),
-    ("gcs_last", 0.02956),
-    ("spo2_last", 0.02939),
-    ("hr_mean", 0.02059),
-    ("rr_mean", 0.01490),
-    ("hr_last", 0.01404),
-    ("sbp_last", 0.01382),
-    ("sbp_mean", 0.01293),
+    ("gcs_last", 0.29696),
+    ("urine_output_24h", 0.24010),
+    ("age", 0.22405),
+    ("bun_last", 0.20116),
+    ("ventilated_24h", 0.18911),
+    ("sbp_last", 0.13688),
+    ("los", 0.10693),
+    ("lactate_last", 0.10621),
+    ("wbc_last", 0.09338),
+    ("hours_admit_to_icu", 0.08467),
 ]
 
 # Analytics SQL: icustay_id + all FEATURE_COLS (which already include los,
@@ -175,7 +177,8 @@ def get_analytics(
     # --- 3. Compute indices and bands ---
     raw_scores = [float(p.get("readiness_score", 0.0)) for p in predictions]
     indices = [compute_readiness_index(s, raw_scores) for s in raw_scores]
-    bands = [readiness_band_from_index(idx) for idx in indices]
+    # Same life-support cap as the census list (lib/guardrails.cap_band).
+    bands = [cap_band(readiness_band_from_index(idx), row) for idx, row in zip(indices, rows)]
 
     total = len(rows)
 

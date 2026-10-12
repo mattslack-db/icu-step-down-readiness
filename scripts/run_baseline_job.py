@@ -13,11 +13,14 @@ dbutils.library.restartPython()
 import sys
 sys.path.append("/Workspace/Users/matt.slack@databricks.com/.bundle/icu_step_down/sandbox/files")
 import importlib
+# Must equal the served version (resources/model_serving.yml entity_version);
+# drift_check.py fails loudly on a baseline/served mismatch.
+MODEL_VERSION = "6"
 import src.monitoring.baseline as b
 importlib.reload(b)
 
-b.write_training_baseline(model_version="2")
-b.append_live_snapshot(model_version="2")
+b.write_training_baseline(model_version=MODEL_VERSION)
+b.append_live_snapshot(model_version=MODEL_VERSION)
 
 spark.sql(
     "SELECT "

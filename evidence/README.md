@@ -9,7 +9,9 @@ so it is readable by reviewers; the full asset manifest is in
 
 | File | What it proves |
 |------|----------------|
-| [`pipeline-run.log`](pipeline-run.log) / [`pipeline-run.txt`](pipeline-run.txt) | Lakeflow pipeline run — every flow COMPLETED + bronze→gold row counts |
+| [`pipeline-run.log`](pipeline-run.log) / [`pipeline-run.txt`](pipeline-run.txt) | Lakeflow pipeline run (CONTINUOUS mode) — every flow COMPLETED + bronze→gold row counts |
+| [`streaming-run.txt`](streaming-run.txt) | Live streaming: events released in bronze ~5s, gold updated ~134s, Lakebase synced ~37s; cohort hold-back verified (4,629 events withheld, 0 leaked) |
+| [`pii-obfuscation.txt`](pii-obfuscation.txt) | UC column masks applied; pseudonymized serving tables live; 40/61,532 patient_features rows pseudonymised on Postgres; pipeline `pii_audit` expectation passing (0 forbidden columns) |
 | [`query-results.csv`](query-results.csv) / [`gold-queries.txt`](gold-queries.txt) | Query results against the governed `icu_step_down.gold.*` tables |
 | [`serving-prediction.json`](serving-prediction.json) / [`serving-prediction.txt`](serving-prediction.txt) | Real `icu-readiness` endpoint response (score + SHAP factors) |
 | [`genie-conversation.md`](genie-conversation.md) / [`genie-qa.txt`](genie-qa.txt) | Genie NL question → generated SQL → result rows |
@@ -20,7 +22,7 @@ so it is readable by reviewers; the full asset manifest is in
 | [`gold-derived-signals.txt`](gold-derived-signals.txt) | `recent_extubation` / `active_bleeding` prevalence |
 | [`care-unit-distribution.txt`](care-unit-distribution.txt) | Synthetic `care_unit` (MICU/SICU/CCU) distribution |
 | [`unit-access-verification.txt`](unit-access-verification.txt) | Live read-only proof of the unit-access mechanism |
-| [`test-run.log`](test-run.log) | Test suites passing (188 backend + 36 frontend + 18 monitoring/genai) |
+| [`test-run.log`](test-run.log) | Test suites passing (198 backend + 37 frontend + 68 pipeline/ML unit + 26 live integration) |
 
 ## Notebooks (committed with cell outputs)
 

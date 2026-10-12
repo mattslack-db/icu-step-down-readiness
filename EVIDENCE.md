@@ -45,10 +45,10 @@ Full event log (every flow `COMPLETED`, bronze→silver→gold): [`evidence/pipe
 (serverless SQL warehouse):
 
 ```
--- readiness_training_set label balance (bounce-back proxy)
+-- readiness_training_set label balance (safe = alive + no readmission + no death in 72h; v2 mislabelled 5,274 deaths as safe)
 readiness_label   n        pct
-0 (not ready)     1,826    3.0%
-1 (ready)         59,706   97.0%
+0 (not safe)      7,297    11.9%   (1,766 bounce-back + 5,521 death + 10 still_in_icu)
+1 (safe)          54,195   88.1%
 
 -- vasopressor / ventilator prevalence (patient_features, n=61,532)
 on_vasopressors  on_ventilator   n
@@ -69,7 +69,7 @@ Full queries + sample feature rows: [`evidence/gold-queries.txt`](evidence/gold-
 ## 3. Real served prediction — Mosaic AI endpoint `icu-readiness`
 
 `databricks serving-endpoints query icu-readiness` (model
-`icu_step_down.ml.readiness_model` v2), two patients, 30 features each. Verbatim response:
+`icu_step_down.ml.readiness_model` v6), two patients, 53 features each. Verbatim response:
 
 ```json
 {
@@ -149,18 +149,30 @@ row counts read from Postgres: [`evidence/lakebase-query.txt`](evidence/lakebase
 
 ---
 
+## 7. PII obfuscation — DOB dropped, identifiers pseudonymized (v6 enhancement)
+
+UC column masks on `gold.subject_id` and `gold.hadm_id` (deterministic pseudonym 'P-' + SHA-256 for non-admins); `gold.pii_audit` scans for forbidden columns (DOB, raw identifiers). Lakebase syncs pre-pseudonymized `gold.census_serving` and `gold.patient_features_serving` to avoid double-masking; Postgres holds 0 raw identifiers (40 census, 61,532 patient_features rows). Age is computed once and capped at 90 (HIPAA Safe Harbor). See [`evidence/pii-obfuscation.txt`](evidence/pii-obfuscation.txt).
+
+---
+
+## 8. Streaming pipeline — CONTINUOUS medallion with live-cohort replay (v6 enhancement)
+
+Pipeline runs 24/7 in CONTINUOUS mode (serverless); bronze tables are STREAMING TABLES reading Delta Share history. Live cohort frozen in `landing.live_cohort` (40 patients); `icu-live-vitals-replay` job (schedule paused by default) releases 1h of real chart events every 5 min via `landing.chart_events_feed` → bronze append flow. Measured latency: released events in bronze ~5s later; gold census features updated ~134s later; Lakebase snapshot sync ~37s. Hold-back verified: 4,629 cohort final-window events withheld from history, 0 leaked, delivered only via feed. See [`evidence/streaming-run.txt`](evidence/streaming-run.txt).
+
+---
+
 ## How the medallion shapes MIMIC-III into readiness features
 
 The pipeline code is in [`src/pipelines/`](src/pipelines/) (`bronze.sql`,
 `silver.sql`, `gold.sql`). The gold `patient_features` row (per ICU stay) is real
 feature engineering off raw clinical events, not a demographic extract:
 
-- **Vitals aggregates** (from `silver.vital_signs`): mean/min/max/last for HR, SBP,
-  DBP, SpO2, temperature, respiratory rate.
-- **Labs**: `lactate_last`, plus derived `active_bleeding` (Hb drop ≥2 g/dL OR
-  INR>1.5 OR platelets<50k).
-- **Support flags**: `on_vasopressors`, `on_ventilator`, derived `recent_extubation`
-  (vent support earlier in stay, none in the final 24h window).
+- **Vitals aggregates** (from `silver.vital_signs`, last 24h window): mean/min/max/last for HR, SBP, DBP, SpO2, temperature, respiratory rate; plus variability (std dev).
+- **Labs (last 24h)**: creatinine, BUN, WBC, haemoglobin, platelets, bicarbonate, sodium, potassium, glucose, `lactate_last` (fixed: charted only before discharge, not post-discharge), plus derived `active_bleeding` (Hb drop ≥2 g/dL OR INR>1.5 OR platelets<50k).
+- **Urine output** (last 24h).
+- **Support flags**: `on_vasopressors`, `on_ventilator`, derived `recent_extubation` (vent earlier in stay, none in final 24h).
+- **Vital-sign charting density** (count of charttime events).
+- **History / context**: prior ICU stays, emergency admission, hours from hospital admission to ICU, surgical ICU, cardiac ICU, male.
 - **Neuro / stay**: `gcs_last`, `los`, `age`.
 - **Synthetic governance dimension**: `care_unit` (MICU/SICU/CCU).
 

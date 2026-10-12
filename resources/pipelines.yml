@@ -8,6 +8,10 @@ resources:
       # spanning bronze, silver, and gold schemas. This field is an API placeholder.
       schema: bronze
       serverless: true
+      # Continuous: the pipeline stays up and processes new rows (the live
+      # replay feed) as they land. Serverless continuous runs 24/7 — stop it
+      # (`databricks pipelines stop <id>`) when not demoing to avoid cost.
+      continuous: true
       channel: CURRENT
       libraries:
         - file:

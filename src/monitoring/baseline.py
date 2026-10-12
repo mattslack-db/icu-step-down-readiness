@@ -45,6 +45,14 @@ _FEATURE_COLS: list[str] = [
     "rr_mean", "rr_min", "rr_max", "rr_last",
     "on_vasopressors", "on_ventilator",
     "gcs_last", "lactate_last", "los", "age",
+    # v3 features
+    "hr_std", "sbp_std", "rr_std", "spo2_std", "n_vital_obs",
+    "creatinine_last", "bun_last", "wbc_last", "hemoglobin_last",
+    "platelets_last", "bicarbonate_last", "sodium_last", "potassium_last",
+    "glucose_last",
+    "urine_output_24h", "vasopressors_24h", "ventilated_24h",
+    "prior_icu_stays", "is_emergency_admit", "hours_admit_to_icu",
+    "is_surgical_unit", "is_cardiac_unit", "is_male",
 ]
 
 # ---------------------------------------------------------------------------
@@ -85,33 +93,31 @@ USING DELTA
 
 def _coerce_feature_frame(df: "pd.DataFrame") -> "pd.DataFrame":
     """
-    Return a new DataFrame with boolean feature columns cast to float64.
+    Return a new DataFrame with every feature column cast to float64.
 
-    MLflow signature enforcement for the readiness model declares
-    on_vasopressors and on_ventilator as double (required), but the upstream
-    Delta tables (gold.readiness_training_set, gold.census) store them
-    as BOOLEAN.  MLflow will NOT auto-cast bool → float64 during signature
-    enforcement — the cast must happen before model.predict is called.
+    The model signature declares all features as double. MLflow signature
+    enforcement will not auto-cast BOOLEAN flags, int64 counts (n_vital_obs,
+    prior_icu_stays — "can not safely convert int64 to float64"), DECIMAL
+    values (object of Decimal) or numeric strings (several MIMIC columns are
+    STRING in Delta), so everything is converted before model.predict.
+    Unparseable values and NULLs become NaN, which LightGBM handles natively.
 
-    The function is dtype-driven (not hardcoded column names) so it handles
-    any boolean column present in the DataFrame, including future additions.
     The input frame is never mutated; a new copy is always returned.
 
     Args:
-        df: Feature DataFrame loaded from a Delta table (may contain bool cols).
+        df: Feature DataFrame loaded from a Delta table.
 
     Returns:
-        New DataFrame with all bool/boolean columns cast to float64; all
-        other columns are unchanged.
+        New DataFrame with all columns as float64.
     """
     import pandas as pd  # type: ignore[import-not-found]  # noqa: PLC0415
 
-    bool_casts = {
-        col: df[col].astype("float64")
-        for col in df.columns
-        if str(df[col].dtype) in ("bool", "boolean")
-    }
-    return df.assign(**bool_casts) if bool_casts else df.copy()
+    def to_float(series: "pd.Series") -> "pd.Series":
+        if str(series.dtype) in ("bool", "boolean"):
+            return series.astype("float64")
+        return pd.to_numeric(series, errors="coerce").astype("float64")
+
+    return df.assign(**{col: to_float(df[col]) for col in df.columns})
 
 
 def parse_scores(predictions: list[str]) -> list[float]:
@@ -215,8 +221,8 @@ def write_training_baseline(
     # Score the training set; parse readiness_score out of the JSON prediction column.
     # Filter out None/NaN prediction values before parsing so a null row from the
     # model (e.g. a row with all-NaN features) cannot crash json.loads.
-    # Coerce bool columns to float64 BEFORE predict — MLflow signature enforcement
-    # declares on_vasopressors/on_ventilator as double and will not auto-cast booleans.
+    # Coerce all features to float64 BEFORE predict — MLflow signature enforcement
+    # declares every feature as double and will not auto-cast bool/int/decimal.
     feature_frame = _coerce_feature_frame(training_pandas[_FEATURE_COLS])
     predictions_df = model.predict(feature_frame)
     preds = [p for p in predictions_df["prediction"] if p is not None]
@@ -295,8 +301,8 @@ def append_live_snapshot(
 
     # Score the census rows.
     # Filter out None/NaN prediction values before parsing (null-safe guard).
-    # Coerce bool columns to float64 BEFORE predict — MLflow signature enforcement
-    # declares on_vasopressors/on_ventilator as double and will not auto-cast booleans.
+    # Coerce all features to float64 BEFORE predict — MLflow signature enforcement
+    # declares every feature as double and will not auto-cast bool/int/decimal.
     feature_frame = _coerce_feature_frame(census_pandas[_FEATURE_COLS])
     predictions_df = model.predict(feature_frame)
     preds = [p for p in predictions_df["prediction"] if p is not None]
