@@ -32,6 +32,7 @@
   .nav{cursor:pointer;user-select:none}
   code{background:#eef2f9;padding:1px 6px;border-radius:6px;font-size:.9em}
   @media(prefers-color-scheme:dark){:root{--ink:#e8eefc;--muted:#9fb0cc;--bg:#0b1220;--card:#131c2e;--line:#243149}}
+  @page wide{size:11in 8.5in}
   @media print{
     :root{--ink:#0b1324;--muted:#5b6b86;--bg:#fff;--card:#fff;--line:#e2e8f2}
     html,body{height:auto;background:#fff}
@@ -39,6 +40,8 @@
     footer{display:none}
     .slide{display:flex!important;min-height:auto;height:100vh;page-break-after:always;break-after:page;padding:8vh 8vw;justify-content:center}
     .slide:last-child{page-break-after:auto;break-after:auto}
+    .slide.wide{page:wide;padding:0.45in 0.6in;height:auto;min-height:0;box-sizing:border-box}
+    .slide.wide img{max-height:4.6in!important}
     .card,.step{box-shadow:none}
     *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
   }
@@ -101,6 +104,13 @@
       <span class="step">Databricks App</span>
     </div>
     <p class="muted" style="margin-top:20px">Integrated, not siloed: the same governed gold tables feed the operational app, the model, and natural-language querying — one lineage, one source of truth.</p>
+  </section>
+
+  <section class="slide wide">
+    <div class="kicker">Architecture</div>
+    <h2>Governed, continuously streaming, AI-scored — on one platform</h2>
+    <img src="architecture.png" alt="ICU Step-Down Readiness architecture: MIMIC-III Delta Share and a live vitals replay stream into a continuous Lakeflow medallion (bronze streaming tables, silver with DOB dropped, gold with masked IDs and in-pipeline scores); Mosaic AI trains, registers and serves model v6; pseudonymised gold copies sync to Lakebase; Unity Catalog governs masks, row-level access and PII audit; the Databricks App and Genie serve clinicians." style="width:100%;max-height:68vh;object-fit:contain;margin-top:10px;border-radius:12px">
+    <p class="muted" style="margin-top:12px">Source data streams in continuously; silver drops date of birth; gold carries masked identifiers and live model scores; the app reads pseudonymised Lakebase copies; Unity Catalog governs every layer. Editable source: <code>deck/architecture.drawio</code>.</p>
   </section>
 
   <section class="slide">
