@@ -18,14 +18,16 @@ MIMIC-III (Delta Share)
 
 ---
 
-## Bronze — raw MIMIC-III ingested as materialized views
+## Bronze — raw MIMIC-III ingested as STREAMING TABLES (CONTINUOUS mode)
 
-`src/pipelines/bronze.sql` reads the Delta-shared MIMIC-III tables and lands
-them as UC materialized views (no transformation): `patients`, `admissions`,
-`icu_stays`, `transfers`, `services`, `prescriptions`, `chart_events`,
-`lab_events`, `input_events_mv`, `input_events_cv`, `procedure_events_mv`,
-`d_labitems`. Row counts (live run): `chart_events 38,776,289`,
-`lab_events 27,854,055`, `icu_stays 61,532`, `admissions 58,976` — see EVIDENCE.md §1.
+`src/pipelines/bronze.sql` reads the Delta-shared MIMIC-III tables. In CONTINUOUS mode (serverless 24/7), bronze tables are **STREAMING TABLES** reading from the Delta Share history (shared WITH HISTORY). A landing stage holds:
+- `landing.live_cohort` — frozen 40-patient cohort (initial seed).
+- `landing.chart_events_feed` — live stream of real chart events; a replay job (`icu-live-vitals-replay`, schedule paused by default) releases 1h of historical events every 5 min, simulating a live cohort.
+- `landing.replay_clock` — timing log of replay progress.
+
+An append flow streams events from `landing.chart_events_feed` into the bronze `chart_events` STREAMING TABLE. Hold-back verified: 4,629 final-window events withheld from the history flow; 0 leaked; they arrive only via the feed. Measured latency: released events in bronze ~5s later; gold features updated ~134s later; Lakebase synced ~37s.
+
+UC materialized views (MVs) read from bronze: `patients`, `admissions`, `icu_stays`, `transfers`, `services`, `prescriptions`, `chart_events`, `lab_events`, `input_events_mv`, `input_events_cv`, `procedure_events_mv`, `d_labitems`. Row counts (live run): `chart_events 38,776,289`, `lab_events 27,854,055`, `icu_stays 61,532`, `admissions 58,976` — see EVIDENCE.md §1 and §8.
 
 ---
 
@@ -64,16 +66,13 @@ WHERE vital_name IS NOT NULL
        OR (vital_name = 'rr'     AND value BETWEEN 4  AND 60) );
 ```
 
-`silver.lab_events` carries a derived `is_lactate` flag (`ITEMID = 50813`);
-`silver.patients` and `silver.icu_stays` are typed/cleaned projections of their
-bronze sources. Result: `silver.vital_signs` = 21,771,413 typed readings.
+`silver.lab_events` carries a derived `is_lactate` flag (`ITEMID = 50813`); `silver.patients` drops DOB, keeps `subject_id`, `gender`, `dod`, `expire_flag`; `silver.icu_stays` is a typed/cleaned projection with age computed once and capped at 90 (HIPAA Safe Harbor). Result: `silver.vital_signs` = 21,771,413 typed readings. Before the pipeline runs, `src/governance/pii_masking.sql` applies UC column masks and pseudonymization functions.
 
 ---
 
-## Gold — 24-hour feature engineering (`gold.patient_features`)
+## Gold — 24-hour feature engineering (`gold.patient_features`, 53 features, v6)
 
-`gold.patient_features` (one row per ICU stay) is the governed feature set the
-model, app, and Genie all consume. Real logic from `src/pipelines/gold.sql`:
+`gold.patient_features` (one row per ICU stay) is the governed feature set the model, app, and Genie all consume. v6 adds 23 new features (total 53; v2 was 30) after label correction and live-cohort out-of-sample exclusion (61,532 − 40 live = 61,492 training rows). Real logic from `src/pipelines/gold.sql`:
 
 ```sql
 -- 24-hour window ending at discharge (or intime + 1 day if still in unit)
@@ -118,10 +117,13 @@ ventilator AS (SELECT ICUSTAY_ID FROM icu_step_down.bronze.procedure_events_mv
                  WHERE ITEMID IN (225792,225794,224385)
                UNION SELECT ICUSTAY_ID FROM icu_step_down.bronze.chart_events
                  WHERE ITEMID IN (720,722,223849)),
--- lactate_last: most recent lactate during the stay
+-- lactate_last: most recent lactate charted BEFORE discharge (v2 bug: took post-ICU draws too)
 lactate AS (SELECT hadm_id, ... QUALIFY ROW_NUMBER() OVER
               (PARTITION BY hadm_id ORDER BY charttime DESC) = 1
-            FROM icu_step_down.silver.lab_events WHERE is_lactate = TRUE),
+            FROM icu_step_down.silver.lab_events WHERE is_lactate = TRUE AND charttime < window_end),
+-- 23 new features (v2→v6): last-24h creatinine, BUN, WBC, haemoglobin, platelets, bicarbonate, sodium, potassium, glucose;
+-- urine output; HR/SBP/RR/SpO2 variability; vital-sign charting density; vasopressors/ventilation in last 24h;
+-- prior ICU stays; emergency admission; hours hospital-to-ICU; surgical ICU; cardiac ICU; male
 ```
 
 Two clinical **guardrail signals** are derived in the same view:
@@ -141,14 +143,13 @@ END AS care_unit   -- synthetic (de-identified data); stable across re-runs
 
 ### Gold outputs built on `patient_features`
 
-- **`gold.readiness_training_set`** = `patient_features` + `readiness_label`
-  (1 = safe step-down, 0 = returned to ICU within 72h). 61,532 rows;
-  59,706 ready / 1,826 bounce-back.
-- **`gold.census`** = the 40 current ICU patients (`SELECT pf.*`), so `care_unit`
-  and the guardrail signals propagate automatically.
+- **`gold.readiness_training_set`** = `patient_features` + `readiness_label` + `label_reason` (1 = safe step-down, 0 = not safe). **v6 label fix:** safe = left ICU alive AND not readmitted AND no death within 72h (v2 incorrectly labelled 5,274 deaths as safe). Training set: 61,492 rows; 54,195 safe / 7,297 not safe (11.9% base rate); breakdown: 1,766 bounce-back, 5,521 death, 10 still_in_icu. Census excluded from training (out-of-sample).
+- **`gold.census`** = the 40 current ICU patients, so `care_unit` and guardrail signals propagate automatically.
+- **`gold.pii_audit`** = pipeline-managed table that scans `icu_step_down.information_schema.columns` for forbidden columns (DOB, raw identifiers) in silver/gold; expectation fails the pipeline if any exist (currently passing: 0 forbidden columns).
+- **`gold.census_serving` & `gold.patient_features_serving`** = same feature rows with pseudonymized identifiers (P-xxxxxxxx, stored not masked) to avoid double-masking when Lakebase syncs to Postgres. App reads `mimic_iii.census` and `mimic_iii.patient_features` from Postgres; no raw identifiers leak to the serving layer.
+- **`gold.census_vitals`** = data-minimized (no `subject_id`); supports the live dashboard refresh.
 
-One governed gold feature set → the serving model, the app, and Genie all read
-the same lineage.
+One governed gold feature set → the serving model, the app, and Genie all read the same lineage. Streaming updates gold ~134s after a chart event is released.
 
 ---
 

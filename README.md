@@ -2,7 +2,7 @@
 
 An end-to-end Databricks data journey that helps ICU clinicians identify which patients are ready to be **safely stepped down** from intensive care — freeing scarce ICU beds while protecting patients from premature transfer.
 
-**Live app:** https://icu-step-down-7474645692590282.aws.databricksapps.com
+**Live app:** https://icu-step-down-7474645901826067.aws.databricksapps.com
 
 > Built for the FE Tech Bar. Data is the **publicly available, de-identified MIMIC-III** research dataset (Delta-shared into the workspace). No real/identifiable patient data is committed to this repo — only aggregate counts, metrics, and small samples as run evidence.
 
@@ -17,10 +17,10 @@ Headline results, as committed text:
 
 - **Lakeflow pipeline run — COMPLETED**, bronze→gold row counts: bronze `admissions 58,976` / `chart_events 38,776,289` / `lab_events 27,854,055` → gold `patient_features 61,532`, `readiness_training_set 61,532`, `census 40`. ([`evidence/pipeline-run.txt`](evidence/pipeline-run.txt))
 - **Query against governed gold tables:** census cohort n=40, avg LOS 2.83d, 8 on pressors / 11 on vent; training label balance 59,706 ready / 1,826 not-ready. ([`evidence/gold-queries.txt`](evidence/gold-queries.txt))
-- **Real served prediction** (Mosaic AI `icu-readiness`, model v2): `readiness_score 0.4739` with factors `lactate_last (risk 0.262)`, `on_ventilator (risk 0.030)`, … — `on_ventilator` shown as **risk** (safety override, live). ([`evidence/serving-prediction.txt`](evidence/serving-prediction.txt))
+- **Real served prediction** (Mosaic AI `icu-readiness`; captured on model v2 — the endpoint now serves v6): `readiness_score 0.4739` with factors `lactate_last (risk 0.262)`, `on_ventilator (risk 0.030)`, … — `on_ventilator` shown as **risk** (safety override, live). ([`evidence/serving-prediction.txt`](evidence/serving-prediction.txt))
 - **Genie Q&A** over the governed tables: *"How many current ICU patients are ready for step-down?"* → generated SQL → `ready=38, not_ready=2, total=40`. ([`evidence/genie-qa.txt`](evidence/genie-qa.txt))
 - **Deployed app RUNNING** + Lakebase synced tables ONLINE; **drift job** PSI 2.15 / KS 0.22; **unit-access** scoped predicate returns 15 MICU rows live. ([`evidence/app-deploy.txt`](evidence/app-deploy.txt), [`evidence/drift-run.txt`](evidence/drift-run.txt), [`evidence/unit-access-verification.txt`](evidence/unit-access-verification.txt))
-- **Test suites passing:** 188 backend + 36 frontend + 18 monitoring/genai = **242 passing** (+17 live integration) — committed run output in [`evidence/test-run.log`](evidence/test-run.log).
+- **Test suites passing:** 198 backend + 37 frontend + 68 pipeline/ML unit + 26 live integration = **329 passing** — committed run output in [`evidence/test-run.log`](evidence/test-run.log).
 
 **Want the transformation logic end to end?** The full bronze→silver→gold medallion SQL and the Genie space configuration are reproduced readably in **[`DATA-JOURNEY.md`](DATA-JOURNEY.md)** (source in [`src/pipelines/`](src/pipelines/) and [`src/genie/`](src/genie/)).
 
@@ -82,7 +82,7 @@ flowchart LR
 | Surface | Databricks App (React + FastAPI) | Census dashboard, patient detail, analytics | [07-app-api](evidence/07-app-api.md) · [07-app-deploy](evidence/07-app-deploy.md) |
 | Provision | FEVM + DABs | AWS serverless sandbox; all assets via Asset Bundles | [00-provisioning](evidence/00-provisioning.md) |
 | Data access | Delta Sharing | Cross-metastore D2D share of the source | [01-data-access](evidence/01-data-access.md) |
-| Tests | pytest + vitest | 188 backend + 36 frontend + 18 monitoring/genai (+17 live integration) — run output in [`evidence/test-run.log`](evidence/test-run.log) | [08-tests](evidence/08-tests.md) |
+| Tests | pytest + vitest | 198 backend + 37 frontend + 68 pipeline/ML unit + 26 live integration — run output in [`evidence/test-run.log`](evidence/test-run.log) | [08-tests](evidence/08-tests.md) |
 
 All evidence files contain **committed, text-readable run output** (row counts, query results, model metrics, deploy logs) — not screenshots.
 
@@ -140,17 +140,34 @@ See [`evidence/README.md`](evidence/README.md) for the capture method and how to
 Everything is deployed through Databricks Asset Bundles against the sandbox (CLI profile `icu-sandbox`):
 
 ```bash
+# 1. PII functions (pseudonym + column mask) — must exist BEFORE the pipeline runs.
+#    Run the statements in src/governance/pii_masking.sql in the SQL editor, or e.g.:
+#    databricks experimental aitools tools query "<statement>" --profile icu-sandbox
+
+# 2. Deploy the pipeline, serving, jobs (app is a separate bundle in app/)
 databricks bundle validate -t sandbox --profile icu-sandbox
-databricks bundle deploy   -t sandbox --profile icu-sandbox   # pipeline, model serving, app
+databricks bundle deploy   -t sandbox --profile icu-sandbox
+
+# 3. Seed the live cohort (one-time, before the first streaming run)
+databricks bundle run icu_live_vitals_replay -t sandbox --profile icu-sandbox --python-params="--seed-only"
+
+# 4. After the pipeline's first pass: governance.sql + row_level_security.sql,
+#    then python src/lakebase/sync_tables.py --profile icu-sandbox --wait
+
+# Train the model (alternative to using the pre-trained v6)
+databricks bundle run icu_readiness_train -t sandbox --profile icu-sandbox
 ```
 
-- **Pipeline:** run the `icu-step-down-readiness-medallion` Lakeflow pipeline to (re)build bronze→silver→gold.
-- **Lakebase sync:** `python src/lakebase/sync_tables.py` (idempotent).
-- **Tests:** `cd app && uv run pytest` (backend, **188**) · `cd app && bunx vitest run` (frontend, **36**) · `pytest tests/monitoring tests/genai` (monitoring/genai, **18**) · `pytest tests/integration -m integration` (pipeline, 17 — needs the `icu-sandbox` profile + `databricks-sql-connector`). Committed run output: [`evidence/test-run.log`](evidence/test-run.log).
+- **Pipeline:** the `icu-step-down-readiness-medallion` runs in CONTINUOUS mode (serverless). Bronze tables are STREAMING TABLES reading from the Delta Share history; silver/gold are materialized views. Stop the pipeline when not demoing (continuous serverless runs 24/7).
+- **Live feed:** the `icu-live-vitals-replay` job (schedule paused by default) releases 1h of real historical chart events every 5 min, simulating a live 40-patient cohort; unpause the schedule to enable streaming demo.
+- **Lakebase sync:** `python src/lakebase/sync_tables.py` (idempotent) creates SNAPSHOT synced tables from the pseudonymised `gold.census_serving` / `gold.patient_features_serving` (UC won't sync column-masked tables), so Postgres never holds raw identifiers. During a live demo the replay job re-triggers the census snapshot syncs after each release.
+- **Tests:** `cd app && uv run pytest` (backend, **188**) · `cd app && bunx vitest run` (frontend, **37**) · `pytest tests -m 'not integration'` (ML feature parity, monitoring, genai, streaming replay — **67**) · `pytest tests/integration -m integration` (live, **26** + 3 deferred until replay completes). Committed run output: [`evidence/test-run.log`](evidence/test-run.log).
 
-## Governance
+## Governance — PII obfuscation + unit-level access
 
-Unity Catalog governance (comments, PII tags, grants) is defined in [`src/governance/governance.sql`](src/governance/governance.sql). Unit-level row-access control — a fail-closed row filter on `census` and `patient_features` scoped to UC account groups `icu_admins`, `icu_micu`, `icu_sicu`, `icu_ccu` — is defined in [`src/governance/row_level_security.sql`](src/governance/row_level_security.sql). Both files must be re-run after any Lakeflow pipeline recreate because Materialized View metadata (comments, tags, and row-filter bindings) is lost on DROP/CREATE.
+**PII removal:** DOB is dropped in silver; age is computed once and capped at 90 (HIPAA Safe Harbor). Raw identifiers (`subject_id`, `hadm_id`) are masked in UC gold tables via column-level masks (deterministic pseudonym 'P-' + 10 hex chars of SHA-256 for non-admins) defined in [`src/governance/pii_masking.sql`](src/governance/pii_masking.sql). Lakebase cannot host masked views (no online materialized views with column security), so the pipeline publishes `gold.census_serving` and `gold.patient_features_serving` with pseudonyms pre-stored, avoiding double-masking while enabling Postgres low-latency reads. The gold `pii_audit` table scans the schema for forbidden columns (DOB, raw identifiers); its expectation fails the pipeline if any exist. See [`evidence/pii-obfuscation.txt`](evidence/pii-obfuscation.txt).
+
+**Unit-level row access:** a fail-closed row filter on `census` and `patient_features` scoped to UC account groups `icu_admins`, `icu_micu`, `icu_sicu`, `icu_ccu` — defined in [`src/governance/row_level_security.sql`](src/governance/row_level_security.sql). Governance must be re-run after any Lakeflow pipeline recreate because MV metadata is lost on DROP/CREATE.
 
 **Two enforcement layers, one care_unit mapping:**
 The `rls_care_unit` row filter enforces per-care-team access for **direct Unity Catalog / SQL-warehouse access** to `gold.census` and `gold.patient_features`. The Databricks App reads **Lakebase-synced Postgres copies** (`mimic_iii.census`, `mimic_iii.patient_features`) using the app service principal (a member of `icu_admins`), which the UC row filter cannot reach — so app-side enforcement is applied separately.
@@ -166,12 +183,13 @@ Operational notes before enabling `enforce_unit_access` (verify live — the san
 
 ## Model honesty
 
-The readiness model (LightGBM on 24h vital/lab/status features) predicts safe step-down (no ICU readmission within 72h). It is intentionally framed as a **relative ranking / decision-support** tool:
+The readiness model (LightGBM on 53 vital/lab/status/history features) predicts safe step-down (left ICU alive, no readmission within 72h, no death within 72h). It is intentionally framed as a **relative ranking / decision-support** tool:
 
-- **AUC ≈ 0.66** — modest discrimination given the retrospective feature set.
-- Bounce-back **PR-AUC ≈ 0.06** (~2× the 3% base rate). The majority-class PR-AUC (~0.98) is **not** a meaningful quality metric and is labeled as misleading in the app.
+- **Headline AUC 0.891** — test-set discrimination after label fix and new feature engineering (v2 was 0.659).
+- **Readmission-only AUC 0.635** — predicting 72h bounce-back alone remains hard; deaths are now separated and labelled honestly.
+- **Not-safe PR-AUC 0.776** (base rate 11.9%) — strong separation of the discharge-risk tail. Label fix was the largest contributor to v2→v6 gain (was 0.062 with only bounce-backs).
 - The app shows a **relative readiness index (0–100, percentile within the current census)** and Ready/Borderline/Not-ready bands — **never** a calibrated "probability of safe discharge."
-- SHAP factors are mapped to clinical labels; known-risk features (on vasopressors/ventilator) are always presented as risks.
+- SHAP factors are mapped to clinical labels; known-risk features (on vasopressors/ventilator) are always presented as risks. **Safety guardrail:** a patient on vasopressors or a ventilator in the last 24h is never banded *Ready* — capped at *Borderline* with the life-support risk listed first, in the app and in the pipeline's `gold.census_scores` (so Genie agrees). See `app/src/icu_step_down/backend/lib/guardrails.py`. See [`evidence/05-ml-metrics.md`](evidence/05-ml-metrics.md) for full v6 details.
 
 ## Presentation deck
 

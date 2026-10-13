@@ -15,7 +15,7 @@ import warnings
 import pytest
 
 # Databricks SQL warehouse details for the icu-sandbox workspace
-_WAREHOUSE_ID = "7cdc2b0c4ec592d8"
+_WAREHOUSE_ID = "c2fa8cdc295a849f"  # Serverless Starter Warehouse (sandbox recreated 2026-10-09)
 _PROFILE = "icu-sandbox"
 
 

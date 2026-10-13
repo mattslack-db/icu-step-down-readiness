@@ -1,0 +1,19 @@
+# Life-support safety guardrail — live verification
+# Captured: 2026-10-12T19:42:16Z | rule: vasopressors or ventilation active in the last 24h → never 'Ready' (capped at 'Borderline'), risk factor injected first
+# Code: app/src/icu_step_down/backend/lib/guardrails.py (cap_band) · src/pipelines/gold.sql (gold.census_scores)
+
+# 1. Pipeline scores (gold.census_scores, scored in-pipeline by model v6) — band x life support
+{"life_support_24h":"false","max_index":"62","n":"10","readiness_band":"Borderline"}
+{"life_support_24h":"true","max_index":"98","n":"6","readiness_band":"Borderline"}
+{"life_support_24h":"false","max_index":"30","n":"11","readiness_band":"Not ready"}
+{"life_support_24h":"true","max_index":"32","n":"3","readiness_band":"Not ready"}
+{"life_support_24h":"false","max_index":"95","n":"10","readiness_band":"Ready"}
+
+# 2. Invariant: no 'Ready' patient on active life support (expect 0)
+{"ready_on_life_support":"0"}
+
+# 3. App /api/census — high-index patients that were capped, with their factors
+{"readiness_index":95,"band":"Borderline","subject_id":"P-5c6cc224a9","factors":["vasopressors in last 24h (risk)","GCS (last) (supports)","last BUN (supports)"]}
+{"readiness_index":92,"band":"Borderline","subject_id":"P-c17e30ca34","factors":["vasopressors in last 24h (risk)","GCS (last) (supports)","last BUN (supports)"]}
+{"readiness_index":78,"band":"Borderline","subject_id":"P-9d915cc8db","factors":["vasopressors in last 24h (risk)","age (years) (risk)","GCS (last) (supports)"]}
+{"readiness_index":72,"band":"Borderline","subject_id":"P-ff4af775c9","factors":["vasopressors in last 24h (risk)","GCS (last) (supports)","last BUN (supports)"]}

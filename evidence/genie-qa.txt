@@ -1,3 +1,26 @@
+# Genie Q&A — live capture over the governed gold tables
+# Captured: 2026-10-12T19:09:10Z | space: ICU Step-Down Readiness (01f1c3c57e2d129db3d00e5882886406) | warehouse: Serverless Starter (c2fa8cdc295a849f)
+# Caller: matt.slack@databricks.com — icu_micu member, so census answers are scoped to MICU (row-level security).
+# 'Ready now' comes from gold.census_scores (scored in the pipeline by the served v6 model), never from historical outcome labels.
+
+## Q: How many current ICU patients are ready for step-down?
+### Generated SQL
+SELECT SUM(CASE WHEN `readiness_band` = 'Ready' THEN 1 ELSE 0 END) AS `ready_for_step_down`, SUM(CASE WHEN `readiness_band` = 'Borderline' THEN 1 ELSE 0 END) AS `borderline`, SUM(CASE WHEN `readiness_band` = 'Not ready' THEN 1 ELSE 0 END) AS `not_ready`, COUNT(*) AS `total_current_patients` FROM `icu_step_down`.`gold`.`census_scores_governed`
+### Answer
+**5** current ICU patients are **ready for step-down**. In the same current census, **6** patients are **Borderline**, **4** patients are **Not ready**, and the query covers **15** total current ICU patients.
+
+## Q: What fraction of ICU stays had a bounce-back within 72 hours?
+### Generated SQL
+SELECT ROUND(try_divide(SUM(CASE WHEN `label_reason` = 'bounce_back' THEN 1 ELSE 0 END) * 100.0,COUNT(*)), 2) AS `bounce_back_pct`, SUM(CASE WHEN `label_reason` = 'bounce_back' THEN 1 ELSE 0 END) AS `bounce_back_count`, SUM(CASE WHEN `label_reason` = 'death' THEN 1 ELSE 0 END) AS `deaths_within_72h`, COUNT(*) AS `total_stays` FROM `icu_step_down`.`gold`.`readiness_training_set`
+### Answer
+**2.87%** of ICU stays had a bounce-back within 72 hours, which is **1,766** bounce-backs out of **61,492** total ICU stays. In this same dataset, there were **5,521** stays labeled as death within 72 hours, so bounce-backs were less common than deaths.
+
+
+# ============================================================================
+# Superseded capture (2026-09-25, previous sandbox) — kept for the record.
+# It answered 'ready now' by joining the census to historical OUTCOME labels,
+# which a live system could not know; fixed by gold.census_scores.
+# ============================================================================
 # Genie Conversation API — live question/answer capture
 # Captured: 2026-09-25T21:49:42Z  |  space_id: 01f1b92aeef914e383e43c1452d294cf  |  profile: icu-sandbox
 # Method: genie start-conversation -> poll get-message until COMPLETED -> get-message-attachment-query-result

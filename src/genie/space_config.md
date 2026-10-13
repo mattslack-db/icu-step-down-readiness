@@ -5,11 +5,11 @@
 | Field | Value |
 |-------|-------|
 | **Title** | ICU Step-Down Readiness |
-| **Space ID** | `01f1ab768fd619ca954173c4f147dc93` |
-| **Warehouse** | Serverless Starter Warehouse (`7cdc2b0c4ec592d8`) |
-| **Workspace URL** | `https://fe-sandbox-icu-step-down-readiness.cloud.databricks.com/genie/rooms/01f1ab768fd619ca954173c4f147dc93` |
+| **Space ID** | `01f1c3c57e2d129db3d00e5882886406` |
+| **Warehouse** | Serverless Starter Warehouse (`c2fa8cdc295a849f`) |
+| **Workspace URL** | `https://fe-sandbox-icu-step-down-readiness.cloud.databricks.com/genie/rooms/01f1c3c57e2d129db3d00e5882886406` |
 | **Parent path** | `/Workspace/Users/matt.slack@databricks.com/genie_spaces` |
-| **Created** | 2026-09-08 (Phase 6 of ICU Step-Down Readiness build) |
+| **Created** | 2026-09-08 (Phase 6); recreated 2026-10-09 on the new sandbox; updated 2026-10-12 to answer current readiness from `gold.census_scores` (pipeline-scored, v6) |
 
 **Space description:** Natural language exploration of ICU patient step-down readiness data. Covers current census (40 patients), 61K historical stays with readiness outcomes, and time-series vitals. Answers questions about who is ready for step-down, bounce-back rates, length of stay, vasopressor/ventilator use, and vital signs by patient cohort.
 
@@ -17,7 +17,7 @@
 
 ## Tables Exposed
 
-Three Unity Catalog tables are attached. `icu_step_down.gold.patient_features` was intentionally excluded: `readiness_training_set` is a strict superset (all same columns plus `readiness_label`) and including both would confuse Genie's table selection.
+Four Unity Catalog tables are attached (2026-10-12: `gold.census_scores_governed` added — the pipeline-scored live census; the full instructions and example SQL are in `genie_agent.json`). `icu_step_down.gold.patient_features` was intentionally excluded: `readiness_training_set` is a strict superset (all same columns plus `readiness_label`) and including both would confuse Genie's table selection.
 
 ### 1. `icu_step_down.gold.census`
 
@@ -182,7 +182,7 @@ The full `serialized_space` JSON is in `src/genie/genie_agent.json`. To recreate
 cd src/genie
 databricks workspace mkdirs /Workspace/Users/<email>/genie_spaces --profile icu-sandbox
 databricks genie create-space --profile icu-sandbox --json "{
-  \"warehouse_id\": \"7cdc2b0c4ec592d8\",
+  \"warehouse_id\": \"c2fa8cdc295a849f\",
   \"title\": \"ICU Step-Down Readiness\",
   \"description\": \"...\",
   \"parent_path\": \"/Workspace/Users/<email>/genie_spaces\",

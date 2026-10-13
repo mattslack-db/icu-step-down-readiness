@@ -7,33 +7,59 @@
 -- =============================================================================
 
 -- ---------------------------------------------------------------------------
--- silver.patients — typed demographics
+-- silver.patients — typed demographics, DATE OF BIRTH REMOVED
+--
+-- PII obfuscation (HIPAA Safe Harbor, 45 CFR 164.514(b)(2)(i)(C)):
+--   DOB is a direct date identifier. It is consumed exactly once — in
+--   silver.icu_stays, to derive whole-year age at ICU admission — and is NOT
+--   carried into silver.patients or any gold table. gold.pii_audit fails the
+--   pipeline if a dob column ever reappears downstream of bronze.
 -- ---------------------------------------------------------------------------
 CREATE OR REFRESH MATERIALIZED VIEW icu_step_down.silver.patients
+COMMENT 'Typed demographics. DOB intentionally dropped (HIPAA Safe Harbor); age lives on silver.icu_stays as capped whole years.'
 AS
 SELECT
   SUBJECT_ID        AS subject_id,
   GENDER            AS gender,
-  CAST(DOB AS TIMESTAMP)  AS dob,
   CAST(DOD AS TIMESTAMP)  AS dod,
   EXPIRE_FLAG       AS expire_flag
 FROM icu_step_down.bronze.patients;
 
 -- ---------------------------------------------------------------------------
--- silver.icu_stays — typed ICU stays
+-- silver.icu_stays — typed ICU stays + admission context + obfuscated age
+--
+-- age_years: whole years at ICU admission, capped at 90. HIPAA Safe Harbor
+--   requires ages over 89 to be aggregated into a single "90 or older"
+--   category; MIMIC-III additionally shifts DOB for >89s so raw ages compute
+--   to ~300. FLOOR + LEAST implements both. The expectation FAILS the update
+--   if any row escapes the cap, so a regression cannot silently publish.
+-- deathtime / admission_type / admittime come from admissions and feed the
+--   gold label (death within 72h = not a safe step-down) and context features.
 -- ---------------------------------------------------------------------------
-CREATE OR REFRESH MATERIALIZED VIEW icu_step_down.silver.icu_stays
+CREATE OR REFRESH MATERIALIZED VIEW icu_step_down.silver.icu_stays (
+  CONSTRAINT age_hipaa_cap EXPECT (age_years IS NULL OR age_years <= 90) ON VIOLATION FAIL UPDATE,
+  CONSTRAINT age_non_negative EXPECT (age_years IS NULL OR age_years >= 0) ON VIOLATION FAIL UPDATE
+)
 AS
 SELECT
-  ICUSTAY_ID        AS icustay_id,
-  SUBJECT_ID        AS subject_id,
-  HADM_ID           AS hadm_id,
-  CAST(INTIME  AS TIMESTAMP) AS intime,
-  CAST(OUTTIME AS TIMESTAMP) AS outtime,
-  LOS               AS los,
-  FIRST_CAREUNIT    AS first_careunit,
-  LAST_CAREUNIT     AS last_careunit
-FROM icu_step_down.bronze.icu_stays;
+  s.ICUSTAY_ID        AS icustay_id,
+  s.SUBJECT_ID        AS subject_id,
+  s.HADM_ID           AS hadm_id,
+  CAST(s.INTIME  AS TIMESTAMP) AS intime,
+  CAST(s.OUTTIME AS TIMESTAMP) AS outtime,
+  s.LOS               AS los,
+  s.FIRST_CAREUNIT    AS first_careunit,
+  s.LAST_CAREUNIT     AS last_careunit,
+  CAST(LEAST(FLOOR(DATEDIFF(CAST(s.INTIME AS TIMESTAMP), CAST(p.DOB AS TIMESTAMP)) / 365.25), 90) AS INT)
+                      AS age_years,
+  CAST(a.ADMITTIME AS TIMESTAMP) AS admittime,
+  CAST(a.DEATHTIME AS TIMESTAMP) AS deathtime,
+  a.ADMISSION_TYPE    AS admission_type
+FROM icu_step_down.bronze.icu_stays s
+JOIN icu_step_down.bronze.patients p
+  ON p.SUBJECT_ID = s.SUBJECT_ID
+LEFT JOIN icu_step_down.bronze.admissions a
+  ON a.HADM_ID = s.HADM_ID;
 
 -- ---------------------------------------------------------------------------
 -- silver.vital_signs — cleaned vitals from bronze.chart_events
@@ -171,3 +197,20 @@ SELECT
   (ITEMID = 50813)                  AS is_lactate
 FROM icu_step_down.bronze.lab_events
 WHERE VALUENUM IS NOT NULL;
+
+-- ---------------------------------------------------------------------------
+-- silver.urine_output — urine volume events (mL), both database eras
+-- Itemids: the standard MIMIC-III urine-output concept set (CareVue 400xx /
+-- 43xxx, MetaVision 2265xx/2274xx). GU irrigant-in (227488) is subtracted
+-- as a negative volume, per the MIMIC code repository convention.
+-- ---------------------------------------------------------------------------
+CREATE OR REFRESH MATERIALIZED VIEW icu_step_down.silver.urine_output
+AS
+SELECT
+  ICUSTAY_ID                        AS icustay_id,
+  CAST(CHARTTIME AS TIMESTAMP)      AS charttime,
+  CASE WHEN ITEMID = 227488 THEN -1 * VALUE ELSE VALUE END AS value_ml
+FROM icu_step_down.bronze.output_events
+WHERE ICUSTAY_ID IS NOT NULL
+  AND VALUE IS NOT NULL
+  AND VALUE BETWEEN 0 AND 5000;

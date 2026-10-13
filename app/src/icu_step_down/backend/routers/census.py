@@ -21,6 +21,7 @@ from sqlmodel import text
 from ..core.dependencies import Dependencies
 from ..lib import access
 from ..lib.feature_labels import normalize_factor
+from ..lib.guardrails import active_guardrail_labels, cap_band
 from ..lib.readiness import compute_readiness_index, readiness_band_from_index
 from ..models import CensusPatient, CensusResponse, FactorOut
 
@@ -63,6 +64,30 @@ FEATURE_COLS: list[str] = [
     "lactate_last",
     "los",
     "age",
+    # v3 features (model version 3)
+    "hr_std",
+    "sbp_std",
+    "rr_std",
+    "spo2_std",
+    "n_vital_obs",
+    "creatinine_last",
+    "bun_last",
+    "wbc_last",
+    "hemoglobin_last",
+    "platelets_last",
+    "bicarbonate_last",
+    "sodium_last",
+    "potassium_last",
+    "glucose_last",
+    "urine_output_24h",
+    "vasopressors_24h",
+    "ventilated_24h",
+    "prior_icu_stays",
+    "is_emergency_admit",
+    "hours_admit_to_icu",
+    "is_surgical_unit",
+    "is_cardiac_unit",
+    "is_male",
 ]
 
 _SELECT_COLS = ", ".join(
@@ -274,7 +299,8 @@ def get_census(
     patients: list[CensusPatient] = []
     for row, pred, idx in zip(rows, predictions, indices):
         raw_score = float(pred.get("readiness_score", 0.0))
-        band = readiness_band_from_index(idx)
+        # Active life support in the last 24h caps the band at Borderline.
+        band = cap_band(readiness_band_from_index(idx), row)
 
         # Top-3 factors by magnitude (explicit sort — model returns top-5 by
         # magnitude already, but sort here makes the guarantee explicit).
@@ -283,13 +309,27 @@ def get_census(
             key=lambda f: float(f.get("magnitude", 0.0)),
             reverse=True,
         )
-        top_factors: list[FactorOut] = []
-        for f in raw_factors[:3]:
+        # Guardrail risks (active life support, bleeding, recent extubation)
+        # lead the list so a capped band is always explained on the row.
+        # Injected risks take the top model magnitude so they sort/display first
+        # (same convention as the patient-detail route).
+        top_magnitude = max((float(f.get("magnitude", 0.0)) for f in raw_factors), default=0.0)
+        top_factors: list[FactorOut] = [
+            FactorOut(name=label, direction="risk", magnitude=top_magnitude)
+            for label in active_guardrail_labels(row)
+        ][:3]
+        shown = {f.name for f in top_factors}
+        for f in raw_factors:
+            if len(top_factors) >= 3:
+                break
             label, direction, magnitude = normalize_factor(
                 f.get("name", ""),
                 f.get("direction", "risk"),
                 float(f.get("magnitude", 0.0)),
             )
+            if label in shown:
+                continue
+            shown.add(label)
             top_factors.append(
                 FactorOut(
                     name=label,

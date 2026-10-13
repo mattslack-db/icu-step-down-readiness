@@ -1,0 +1,54 @@
+# PII obfuscation — live verification
+# Captured: 2026-10-12T18:45:26Z | profile: icu-sandbox | workspace: fe-sandbox-icu-step-down-readiness
+# Caller: matt.slack@databricks.com — member of icu_micu, NOT icu_admins (masks apply)
+
+# 1. silver.patients columns (DOB dropped; HIPAA Safe Harbor)
+{"column_name":"subject_id"}
+{"column_name":"gender"}
+{"column_name":"dod"}
+{"column_name":"expire_flag"}
+
+# 2. Any DOB-like column anywhere in silver/gold (expect none)
+
+# 3. gold.pii_audit — written by the pipeline; expectation FAILS the update if forbidden_columns > 0
+{"audited_at":"2026-10-12T18:39:36.528Z","forbidden_columns":"0","offending_columns":""}
+
+# 4. Age obfuscation: whole years, capped at 90 (expectations age_hipaa_cap / age_non_negative FAIL UPDATE)
+{"aggregated_90_plus":"2721","max_age":"90","min_age":"0","stays":"61532"}
+
+# 5. UC column mask on gold identifiers — what a non-admin sees (icustay_id/features intact)
+{"age":"81","care_unit":"MICU","hadm_id":"P-284855e769","icustay_id":"201642","subject_id":"P-f76898badb"}
+{"age":"64","care_unit":"CCU","hadm_id":"P-a666a93df5","icustay_id":"204377","subject_id":"P-c17e30ca34"}
+{"age":"36","care_unit":"MICU","hadm_id":"P-faa5941f9b","icustay_id":"207879","subject_id":"P-1b181601ee"}
+
+# 6. Mask coverage for this (non-admin) caller across gold
+{"masked":"40","n":"40","t":"census"}
+{"masked":"61532","n":"61532","t":"patient_features"}
+{"masked":"61492","n":"61492","t":"readiness_training_set"}
+
+# 7. Serving (Lakebase source) tables store pseudonyms AT REST (expectations no_raw_subject_id / no_raw_hadm_id FAIL UPDATE)
+{"n":"40","raw_ids":"0","t":"census_serving"}
+{"n":"61532","raw_ids":"0","t":"patient_features_serving"}
+
+# 8. Mask and serving use one pseudonym function (same token)
+{"mask_for_non_admin":"P-104423c811","pseudonym":"P-104423c811"}
+
+echo "# 9. Pipeline event log — PII expectations evaluated by Lakeflow on the latest update (FAIL UPDATE on any violation)"
+echo "# SELECT ... FROM event_log('9d6181f7-d1bb-48ba-8501-3126ff309c70') — flow_progress.data_quality.expectations"
+head -8 /tmp/icu_expect.txt
+echo
+# 9. Pipeline event log — PII expectations evaluated by Lakeflow on the latest update (FAIL UPDATE on any violation)
+# SELECT ... FROM event_log('9d6181f7-d1bb-48ba-8501-3126ff309c70') — flow_progress.data_quality.expectations
+{"expectation":"no_raw_subject_id","failed":"0","flow":"icu_step_down.gold.patient_features_serving","last_evaluated":"2026-10-12T18:45:45.293Z","passed":"61532"}
+{"expectation":"no_raw_hadm_id","failed":"0","flow":"icu_step_down.gold.patient_features_serving","last_evaluated":"2026-10-12T18:45:45.293Z","passed":"61532"}
+{"expectation":"age_hipaa_cap","failed":"0","flow":"icu_step_down.bronze.patient_features_base","last_evaluated":"2026-10-12T18:45:36.292Z","passed":"61532"}
+{"expectation":"age_non_negative","failed":"0","flow":"icu_step_down.silver.icu_stays","last_evaluated":"2026-10-12T18:45:02.522Z","passed":"61532"}
+{"expectation":"age_hipaa_cap","failed":"0","flow":"icu_step_down.silver.icu_stays","last_evaluated":"2026-10-12T18:45:02.522Z","passed":"61532"}
+{"expectation":"no_raw_subject_id","failed":"0","flow":"icu_step_down.gold.census_serving","last_evaluated":"2026-10-12T18:44:55.676Z","passed":"40"}
+{"expectation":"no_raw_hadm_id","failed":"0","flow":"icu_step_down.gold.census_serving","last_evaluated":"2026-10-12T18:44:55.676Z","passed":"40"}
+{"expectation":"no_dob_in_curated_layers","failed":"0","flow":"icu_step_down.gold.pii_audit","last_evaluated":"2026-10-12T18:39:48.912Z","passed":"1"}
+
+# 10. Lakebase (Postgres) — the app's read path holds pseudonyms only
+{'table': 'mimic_iii.census', 'rows': 40, 'raw_identifiers': 0}
+{'table': 'mimic_iii.patient_features', 'rows': 61532, 'raw_identifiers': 0}
+{'table': 'mimic_iii.census_vitals', 'columns': ['row_id', 'icustay_id', 'charttime', 'vital_name', 'value']}

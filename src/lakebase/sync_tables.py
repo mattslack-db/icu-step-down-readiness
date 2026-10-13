@@ -25,24 +25,20 @@ Each step checks existence before creating:
 
 Source tables
 -------------
-  icu_step_down.gold.census          (40 rows)          PK: icustay_id
-  icu_step_down.gold.patient_features (61,532 rows)     PK: icustay_id
-  icu_step_down.gold.census_vitals   (711 rows)         PK: row_id (synthetic)
+  icu_step_down.gold.census_serving           (40 rows)      PK: icustay_id
+  icu_step_down.gold.patient_features_serving (61,532 rows)  PK: icustay_id
+  icu_step_down.gold.census_vitals   (~16k rows)        PK: row_id (synthetic)
 
-census_vitals is a scoped helper table created in UC gold before syncing:
-  CREATE TABLE icu_step_down.gold.census_vitals AS
-  SELECT
-    CAST(ROW_NUMBER() OVER (ORDER BY vs.icustay_id, vs.charttime, vs.vital_name)
-         AS BIGINT) AS row_id,
-    vs.icustay_id, vs.subject_id, vs.charttime, vs.vital_name, vs.value
-  FROM icu_step_down.silver.vital_signs vs
-  JOIN icu_step_down.gold.census c ON vs.icustay_id = c.icustay_id
+census_vitals is a pipeline-managed materialized view (src/pipelines/gold.sql):
+vital signs for the census stays only, keyed by icustay_id, with no
+subject_id (data minimisation). The natural composite key
+(icustay_id, charttime, vital_name) has a few duplicates, so a synthetic
+row_id is used as the primary key.
 
-Rationale: vital_signs has 21.7M rows. Scoping to the 40 census icustay_ids
-gives 711 rows — sufficient for the patient-detail vitals chart while avoiding
-an oversized sync for a demo workload. The natural composite key
-(icustay_id, charttime, vital_name) has 2 duplicates, so a synthetic row_id
-is used as the primary key.
+PII: UC refuses to sync tables that carry column masks, so the sources are
+the pipeline's *_serving tables, which STORE P- pseudonyms for
+subject_id/hadm_id (src/pipelines/gold.sql; expectation-enforced). Postgres
+and the app therefore never hold raw identifiers.
 
 Target Postgres location
 ------------------------
@@ -79,7 +75,9 @@ PROFILE = "icu-sandbox"
 PROJECT_ID = "icu-step-down"
 BRANCH_ID = "production"
 BRANCH_PATH = f"projects/{PROJECT_ID}/branches/{BRANCH_ID}"
-LAKEBASE_UC_CATALOG = "mimic_iii"
+# Not "mimic_iii": that name is held by an orphaned catalog bound to the
+# expired sandbox's Lakebase project and can't be deleted cross-workspace.
+LAKEBASE_UC_CATALOG = "icu_step_down_lakebase"
 POSTGRES_DATABASE = "databricks_postgres"
 POSTGRES_SCHEMA = "mimic_iii"
 STORAGE_CATALOG = "icu_step_down"
@@ -89,12 +87,12 @@ PROJECT_DISPLAY_NAME = "ICU Step-Down Readiness"
 SYNCED_TABLES = [
     {
         "target": f"{LAKEBASE_UC_CATALOG}.{POSTGRES_SCHEMA}.census",
-        "source": "icu_step_down.gold.census",
+        "source": "icu_step_down.gold.census_serving",
         "primary_key_columns": ["icustay_id"],
     },
     {
         "target": f"{LAKEBASE_UC_CATALOG}.{POSTGRES_SCHEMA}.patient_features",
-        "source": "icu_step_down.gold.patient_features",
+        "source": "icu_step_down.gold.patient_features_serving",
         "primary_key_columns": ["icustay_id"],
     },
     {
@@ -108,15 +106,16 @@ SYNCED_TABLES = [
         # is NOT directly queryable through the Lakebase Postgres connection.
         #
         # SNAPSHOT scheduling policy: on each sync, the entire Postgres table is
-        # replaced by the current contents of the Delta source. The drift table
-        # holds exactly two rows per run (PSI and KS); 'metric' is unique in the
-        # snapshot at any point in time, so it serves as a stable primary key.
+        # replaced by the current contents of the Delta source. The drift job
+        # APPENDS two rows per run (PSI and KS), so 'metric' alone repeats after
+        # the second run; (metric, computed_at) is unique per row. The app reads
+        # the latest row per metric via ORDER BY computed_at DESC.
         # Freshness lag: the Postgres copy reflects the last completed SNAPSHOT
         # sync cycle; the drift job does NOT trigger an on-demand re-sync. Typical
         # lag is one sync interval (configured on the synced table pipeline).
         "target": f"{LAKEBASE_UC_CATALOG}.{POSTGRES_SCHEMA}.readiness_drift",
         "source": f"{STORAGE_CATALOG}.gold.readiness_drift",
-        "primary_key_columns": ["metric"],
+        "primary_key_columns": ["metric", "computed_at"],
     },
 ]
 

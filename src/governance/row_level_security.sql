@@ -111,3 +111,9 @@ CREATE OR REPLACE VIEW icu_step_down.gold.census_governed AS
 CREATE OR REPLACE VIEW icu_step_down.gold.patient_features_governed AS
   SELECT * FROM icu_step_down.gold.patient_features
   WHERE icu_step_down.gold.rls_care_unit(care_unit);
+
+-- Pipeline-scored live census (gold.census_scores) — same fail-closed care-unit
+-- scoping. Genie answers current-readiness questions from this view.
+CREATE OR REPLACE VIEW icu_step_down.gold.census_scores_governed AS
+  SELECT * FROM icu_step_down.gold.census_scores
+  WHERE icu_step_down.gold.rls_care_unit(care_unit);

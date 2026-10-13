@@ -49,11 +49,12 @@ class TestGlobalFeatureImportance:
                 name in FEATURE_LABELS
             ), f"Feature '{name}' in importance list has no label in FEATURE_LABELS"
 
-    def test_top_feature_is_lactate(self) -> None:
-        """Lactate is the dominant feature in the v2 model (importance ~0.246)."""
+    def test_top_feature_is_gcs(self) -> None:
+        """GCS leads in v6 (importance ~0.297). v2's lactate dominance was partly
+        leakage: it used post-ICU lactate values, fixed in the v3 pipeline."""
         top_name, top_val = _GLOBAL_FEATURE_IMPORTANCE[0]
-        assert top_name == "lactate_last"
-        assert top_val == pytest.approx(0.24580, abs=1e-4)
+        assert top_name == "gcs_last"
+        assert top_val == pytest.approx(0.29696, abs=1e-4)
 
     def test_at_least_ten_features(self) -> None:
         assert len(_GLOBAL_FEATURE_IMPORTANCE) >= 10
@@ -79,8 +80,10 @@ class TestFeatureColsAlignment:
         assert "lactate_last" in FEATURE_COLS
 
     def test_expected_column_count(self) -> None:
-        # 4 vitals × 6 types (hr, sbp, dbp, spo2, temp_c, rr) + 2 binary + gcs + lactate + los + age = 30
-        assert len(FEATURE_COLS) == 30
+        # v2: 4 vitals × 6 types + 2 binary + gcs + lactate + los + age = 30
+        # v3: + 4 variability + charting count + 9 labs + urine + 2 active-support
+        #     + prior stays + emergency + hours-to-ICU + 2 unit type + sex = 53
+        assert len(FEATURE_COLS) == 53
 
     def test_all_importance_features_are_in_feature_cols(self) -> None:
         """Every feature tracked in global importance must be in the feature column list."""

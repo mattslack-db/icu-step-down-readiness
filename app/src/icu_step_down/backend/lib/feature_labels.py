@@ -11,7 +11,7 @@ from __future__ import annotations
 from .guardrails import GUARDRAILS, apply_direction_override  # noqa: F401 (re-exported)
 
 # ---------------------------------------------------------------------------
-# Human-readable clinical labels for all 30 model feature columns.
+# Human-readable clinical labels for every model feature column.
 # ---------------------------------------------------------------------------
 
 FEATURE_LABELS: dict[str, str] = {
@@ -45,6 +45,30 @@ FEATURE_LABELS: dict[str, str] = {
     "lactate_last": "last lactate",
     "los": "ICU length of stay (days)",
     "age": "age (years)",
+    # v3 features
+    "hr_std": "heart-rate variability",
+    "sbp_std": "systolic BP variability",
+    "rr_std": "respiratory-rate variability",
+    "spo2_std": "SpO₂ variability",
+    "n_vital_obs": "vital-sign charting frequency",
+    "creatinine_last": "last creatinine",
+    "bun_last": "last BUN",
+    "wbc_last": "last white cell count",
+    "hemoglobin_last": "last haemoglobin",
+    "platelets_last": "last platelet count",
+    "bicarbonate_last": "last bicarbonate",
+    "sodium_last": "last sodium",
+    "potassium_last": "last potassium",
+    "glucose_last": "last glucose",
+    "urine_output_24h": "urine output (last 24h)",
+    "vasopressors_24h": "vasopressors in last 24h",
+    "ventilated_24h": "ventilated in last 24h",
+    "prior_icu_stays": "prior ICU stays",
+    "is_emergency_admit": "emergency admission",
+    "hours_admit_to_icu": "hours from admission to ICU",
+    "is_surgical_unit": "surgical ICU",
+    "is_cardiac_unit": "cardiac ICU",
+    "is_male": "male",
 }
 
 # ---------------------------------------------------------------------------
@@ -55,7 +79,7 @@ FEATURE_LABELS: dict[str, str] = {
 # ---------------------------------------------------------------------------
 
 ALWAYS_RISK_FEATURES: frozenset[str] = frozenset(
-    g.feature for g in GUARDRAILS if g.kind == "override_risk"
+    g.feature for g in GUARDRAILS if g.kind == "override_risk" or g.caps_ready
 )
 
 

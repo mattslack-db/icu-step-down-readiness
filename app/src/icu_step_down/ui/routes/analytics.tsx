@@ -238,27 +238,25 @@ function AnalyticsContent() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <div className="border rounded-lg p-3 text-center">
               <p className="text-xs text-muted-foreground">AUC-ROC</p>
-              <p className="text-2xl font-bold">0.66</p>
+              <p className="text-2xl font-bold">0.89</p>
               <p className="text-xs text-muted-foreground">
-                Modest discrimination
+                Safe step-down vs readmission or death
               </p>
             </div>
             <div className="border rounded-lg p-3 text-center">
               <p className="text-xs text-muted-foreground">
-                Precision-Recall AUC
+                Readmission-only AUC
               </p>
-              <p className="text-2xl font-bold text-amber-600">0.98</p>
+              <p className="text-2xl font-bold text-amber-600">0.63</p>
               <p className="text-xs text-amber-600">
-                Misleading: driven by class imbalance
+                Bounce-backs alone remain hard
               </p>
             </div>
             <div className="border rounded-lg p-3 text-center">
+              <p className="text-xs text-muted-foreground">Not-safe PR-AUC</p>
+              <p className="text-2xl font-bold">0.78</p>
               <p className="text-xs text-muted-foreground">
-                Bounce-back PR-AUC
-              </p>
-              <p className="text-2xl font-bold text-red-600">~0.06</p>
-              <p className="text-xs text-red-600">
-                Poor readmission prediction
+                vs 12% base rate
               </p>
             </div>
             <div className="border rounded-lg p-3 text-center">
@@ -272,18 +270,16 @@ function AnalyticsContent() {
 
           <div className="text-xs text-muted-foreground space-y-1 border-t pt-3">
             <p>
-              <strong>Important:</strong> The 0.98 PR-AUC is a statistical
-              artifact of severe class imbalance (few positive outcomes in
-              MIMIC-III) and does not indicate the model is highly accurate.
+              <strong>What changed in v3:</strong> the outcome now counts death
+              within 72h of leaving the ICU as an unsafe step-down (v2 counted
+              those patients as safe), and 23 lab, urine-output and
+              active-support features were added. Most of the AUC gain comes
+              from that clinically correct label.
             </p>
             <p>
-              The AUC of 0.66 provides modest discrimination — better than
-              random (0.5) but well below high-confidence thresholds.
-            </p>
-            <p>
-              The bounce-back PR-AUC of ~0.06 indicates the model has limited
-              ability to predict which transferred patients will be
-              re-admitted. Do not use for definitive transfer decisions.
+              On the readmission-only subset (deaths excluded) the AUC is 0.63:
+              the model is strong at flagging patients at risk of dying, but
+              predicting 72h bounce-back alone remains difficult.
             </p>
             <p className="font-medium text-foreground/70">
               This tool is decision support. All transfers must be clinically
@@ -390,8 +386,8 @@ function AnalyticsContent() {
       <DriftMonitorTile drift={data.drift_status} />
 
       <p className="text-xs text-muted-foreground text-center pb-4">
-        MIMIC-III de-identified research data &middot; Model v2 &middot;
-        AUC-ROC 0.66 &middot; For decision support only
+        MIMIC-III de-identified research data &middot; Model v6 &middot;
+        AUC-ROC 0.89 (readmission-only 0.63) &middot; For decision support only
       </p>
     </div>
   );

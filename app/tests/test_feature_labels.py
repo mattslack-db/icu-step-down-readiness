@@ -12,18 +12,10 @@ from icu_step_down.backend.lib.feature_labels import (
 
 
 class TestFeatureLabels:
-    def test_all_30_feature_cols_covered(self) -> None:
-        """All 30 model feature columns must have explicit labels."""
-        FEATURE_COLS = [
-            "hr_mean", "hr_min", "hr_max", "hr_last",
-            "sbp_mean", "sbp_min", "sbp_max", "sbp_last",
-            "dbp_mean", "dbp_min", "dbp_max", "dbp_last",
-            "spo2_mean", "spo2_min", "spo2_max", "spo2_last",
-            "temp_c_mean", "temp_c_min", "temp_c_max", "temp_c_last",
-            "rr_mean", "rr_min", "rr_max", "rr_last",
-            "on_vasopressors", "on_ventilator",
-            "gcs_last", "lactate_last", "los", "age",
-        ]
+    def test_all_model_feature_cols_covered(self) -> None:
+        """Every column the app scores with must have an explicit clinical label."""
+        from icu_step_down.backend.routers.census import FEATURE_COLS
+
         missing = [c for c in FEATURE_COLS if c not in FEATURE_LABELS]
         assert not missing, f"Missing labels for: {missing}"
 

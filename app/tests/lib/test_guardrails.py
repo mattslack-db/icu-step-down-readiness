@@ -65,3 +65,51 @@ def test_guardrail_kinds_are_valid():
     valid_kinds = {"override_risk", "inject_risk"}
     for g in GUARDRAILS:
         assert g.kind in valid_kinds, f"Unknown kind {g.kind!r} for {g.feature!r}"
+
+
+# ---------------------------------------------------------------------------
+# Active life support (last 24h) caps the band below "Ready"
+# ---------------------------------------------------------------------------
+
+from icu_step_down.backend.lib.guardrails import (  # noqa: E402
+    active_guardrail_labels,
+    cap_band,
+)
+
+
+def test_active_life_support_guardrails_are_registered_and_cap_ready():
+    by_feature = {g.feature: g for g in GUARDRAILS}
+    for feature in ("vasopressors_24h", "ventilated_24h"):
+        assert by_feature[feature].kind == "inject_risk"
+        assert by_feature[feature].caps_ready is True
+
+
+def test_active_life_support_direction_forced_to_risk():
+    """As model features, active pressors/ventilation can never 'support' readiness."""
+    assert apply_direction_override("vasopressors_24h", "supports") == "risk"
+    assert apply_direction_override("ventilated_24h", "supports") == "risk"
+
+
+def test_ready_capped_to_borderline_when_ventilated_in_last_24h():
+    assert cap_band("Ready", {"ventilated_24h": True}) == "Borderline"
+
+
+def test_ready_capped_to_borderline_when_on_vasopressors_in_last_24h():
+    assert cap_band("Ready", {"vasopressors_24h": "true"}) == "Borderline"
+
+
+def test_cap_only_lowers_ready():
+    row = {"ventilated_24h": True, "vasopressors_24h": True}
+    assert cap_band("Borderline", row) == "Borderline"
+    assert cap_band("Not ready", row) == "Not ready"
+
+
+def test_ready_kept_without_active_life_support():
+    row = {"ventilated_24h": False, "vasopressors_24h": None,
+           "on_ventilator": True, "on_vasopressors": True}  # stay-level flags don't cap
+    assert cap_band("Ready", row) == "Ready"
+
+
+def test_active_guardrail_labels_lists_each_set_inject_flag_once():
+    row = {"ventilated_24h": True, "vasopressors_24h": False, "active_bleeding": "t"}
+    assert active_guardrail_labels(row) == ["active bleeding / coagulopathy", "ventilated in last 24h"]  # registry order

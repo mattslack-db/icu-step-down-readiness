@@ -26,7 +26,7 @@ from ..genai.narrative import Factor, build_narrative
 from ..lib import access
 from ..lib.care_plan import build_care_plan
 from ..lib.feature_labels import normalize_factor
-from ..lib.guardrails import GUARDRAILS
+from ..lib.guardrails import GUARDRAILS, cap_band
 from ..lib.readiness import compute_readiness_index, readiness_band_from_index
 from ..models import (
     CarePlanOut,
@@ -133,7 +133,7 @@ TOP_N_DISPLAY_FACTORS: int = 5
 _INJECT_EPSILON: float = 1e-4
 
 _LACTATE_NOTE = (
-    "Lactate is the dominant model feature. When lactate is *measured*, "
+    "Lactate is among the top model features. When lactate is *measured*, "
     "even a low value signals a more complex stay; when it is *absent* (NULL), "
     "LightGBM's NaN path often indicates a quick, uncomplicated course. "
     "Interpret the lactate factor in clinical context."
@@ -318,7 +318,7 @@ def get_patient(
 
     # --- 5. Compute relative index and band ---
     readiness_index = compute_readiness_index(patient_score, all_scores)
-    band = readiness_band_from_index(readiness_index)
+    band = cap_band(readiness_band_from_index(readiness_index), row)
 
     # --- 6. Build response factors (sorted by magnitude desc, direction-corrected) ---
     raw_factors: list[dict[str, Any]] = sorted(

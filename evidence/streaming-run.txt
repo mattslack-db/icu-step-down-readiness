@@ -1,0 +1,63 @@
+# Continuous streaming pipeline + live replay — live verification
+# Captured: 2026-10-12T18:47:22Z | profile: icu-sandbox | pipeline: icu-step-down-readiness-medallion (9d6181f7-d1bb-48ba-8501-3126ff309c70)
+
+# 1. Pipeline mode and state
+{"name":"icu-step-down-readiness-medallion","continuous":true,"serverless":true,"state":"RUNNING","latest_update":"RUNNING"}
+
+# 2. Bronze tables are STREAMING tables (incremental ingestion from the Delta Share, shared WITH HISTORY)
+{"table_name":"__9d6181f7_d1bb_48ba_8501_3126ff309c70_census_base","table_type":"MATERIALIZED_VIEW"}
+{"table_name":"__9d6181f7_d1bb_48ba_8501_3126ff309c70_patient_features_base","table_type":"MATERIALIZED_VIEW"}
+{"table_name":"__materialization_mat_9d6181f7_d1bb_48ba_8501_3126ff309c70_admissions_1","table_type":"MANAGED"}
+{"table_name":"__materialization_mat_9d6181f7_d1bb_48ba_8501_3126ff309c70_census_base_1","table_type":"MANAGED"}
+{"table_name":"__materialization_mat_9d6181f7_d1bb_48ba_8501_3126ff309c70_chart_events_1","table_type":"MANAGED"}
+{"table_name":"__materialization_mat_9d6181f7_d1bb_48ba_8501_3126ff309c70_d_labitems_1","table_type":"MANAGED"}
+{"table_name":"__materialization_mat_9d6181f7_d1bb_48ba_8501_3126ff309c70_icu_stays_1","table_type":"MANAGED"}
+{"table_name":"__materialization_mat_9d6181f7_d1bb_48ba_8501_3126ff309c70_input_events_cv_1","table_type":"MANAGED"}
+{"table_name":"__materialization_mat_9d6181f7_d1bb_48ba_8501_3126ff309c70_input_events_mv_1","table_type":"MANAGED"}
+{"table_name":"__materialization_mat_9d6181f7_d1bb_48ba_8501_3126ff309c70_lab_events_1","table_type":"MANAGED"}
+{"table_name":"__materialization_mat_9d6181f7_d1bb_48ba_8501_3126ff309c70_output_events_1","table_type":"MANAGED"}
+{"table_name":"__materialization_mat_9d6181f7_d1bb_48ba_8501_3126ff309c70_patient_features_base_1","table_type":"MANAGED"}
+{"table_name":"__materialization_mat_9d6181f7_d1bb_48ba_8501_3126ff309c70_patients_1","table_type":"MANAGED"}
+{"table_name":"__materialization_mat_9d6181f7_d1bb_48ba_8501_3126ff309c70_prescriptions_1","table_type":"MANAGED"}
+{"table_name":"__materialization_mat_9d6181f7_d1bb_48ba_8501_3126ff309c70_procedure_events_mv_1","table_type":"MANAGED"}
+{"table_name":"__materialization_mat_9d6181f7_d1bb_48ba_8501_3126ff309c70_services_1","table_type":"MANAGED"}
+{"table_name":"__materialization_mat_9d6181f7_d1bb_48ba_8501_3126ff309c70_transfers_1","table_type":"MANAGED"}
+{"table_name":"admissions","table_type":"STREAMING_TABLE"}
+{"table_name":"chart_events","table_type":"STREAMING_TABLE"}
+{"table_name":"d_labitems","table_type":"STREAMING_TABLE"}
+{"table_name":"event_log_7b407204_d430_492e_b20b_239a1188803f","table_type":"MANAGED"}
+{"table_name":"event_log_9d6181f7_d1bb_48ba_8501_3126ff309c70","table_type":"MANAGED"}
+{"table_name":"event_log_f216d643_ef34_425f_a09a_f1b797b55395","table_type":"MANAGED"}
+{"table_name":"icu_stays","table_type":"STREAMING_TABLE"}
+{"table_name":"input_events_cv","table_type":"STREAMING_TABLE"}
+{"table_name":"input_events_mv","table_type":"STREAMING_TABLE"}
+{"table_name":"lab_events","table_type":"STREAMING_TABLE"}
+{"table_name":"output_events","table_type":"STREAMING_TABLE"}
+{"table_name":"patients","table_type":"STREAMING_TABLE"}
+{"table_name":"prescriptions","table_type":"STREAMING_TABLE"}
+{"table_name":"procedure_events_mv","table_type":"STREAMING_TABLE"}
+{"table_name":"services","table_type":"STREAMING_TABLE"}
+{"table_name":"transfers","table_type":"STREAMING_TABLE"}
+
+# 3. Live cohort (frozen census) and replay clock
+{"cohort_stays":"40"}
+{"hours_released":"12.0","released_at":"2026-10-12T18:37:58.237Z"}
+
+# 4. Hold-back: cohort events inside their final-24h window reach bronze ONLY via the live feed
+{"bronze_chart_events_total":"38774159","cohort_window_events_in_bronze":"2499","released_to_feed":"2499"}
+
+# 5. Live release: hours [12,13) — timings from job finish to each layer
+{"avg_vital_obs_before":"63.31","total_obs_before":"2469"}
+  job: INFO:__main__:Released hours [12.0, 13.0) of the final 24h for the cohort; feed now 2716 events.
+  job finished: 18:49:00
+  bronze caught up with feed (2716 events, +217 new) after 5s
+  gold.census features updated (total vital obs 2469 -> 2685) after 134s
+  Lakebase snapshot sync (census, census_vitals) COMPLETED in 37s
+  app /api/census after sync (top 3):
+    {"readiness_index":98,"band":"Ready","subject_id":"P-46aa1b1a9c","top_factor":"GCS (last)"}
+    {"readiness_index":95,"band":"Ready","subject_id":"P-5c6cc224a9","top_factor":"GCS (last)"}
+    {"readiness_index":92,"band":"Ready","subject_id":"P-c17e30ca34","top_factor":"GCS (last)"}
+
+# Note: the replay job triggers the Lakebase refresh right after releasing, i.e. before the
+# continuous pipeline has recomputed gold, so the app lags by one release (~5 min on the
+# schedule). The replay schedule ships PAUSED; unpause icu-live-vitals-replay to run a demo.

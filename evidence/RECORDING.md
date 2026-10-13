@@ -14,7 +14,7 @@
 3. **Analytics** — band distribution, LOS by band, and the model-drift tile (PSI/KS).
 4. **Genie** — ask *"How many current ICU patients are ready for step-down?"* and show the generated SQL + answer.
 
-Live app URL: https://icu-step-down-7474645692590282.aws.databricksapps.com
+Live app URL: https://icu-step-down-7474645901826067.aws.databricksapps.com
 
 Static readable evidence of each of these is committed in this `evidence/`
 folder (`pipeline-run.log`, `query-results.csv`, `serving-prediction.json`,

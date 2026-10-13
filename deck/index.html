@@ -32,6 +32,7 @@
   .nav{cursor:pointer;user-select:none}
   code{background:#eef2f9;padding:1px 6px;border-radius:6px;font-size:.9em}
   @media(prefers-color-scheme:dark){:root{--ink:#e8eefc;--muted:#9fb0cc;--bg:#0b1220;--card:#131c2e;--line:#243149}}
+  @page wide{size:11in 8.5in}
   @media print{
     :root{--ink:#0b1324;--muted:#5b6b86;--bg:#fff;--card:#fff;--line:#e2e8f2}
     html,body{height:auto;background:#fff}
@@ -39,6 +40,8 @@
     footer{display:none}
     .slide{display:flex!important;min-height:auto;height:100vh;page-break-after:always;break-after:page;padding:8vh 8vw;justify-content:center}
     .slide:last-child{page-break-after:auto;break-after:auto}
+    .slide.wide{page:wide;padding:0.45in 0.6in;height:auto;min-height:0;box-sizing:border-box}
+    .slide.wide img{max-height:4.6in!important}
     .card,.step{box-shadow:none}
     *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
   }
@@ -103,17 +106,24 @@
     <p class="muted" style="margin-top:20px">Integrated, not siloed: the same governed gold tables feed the operational app, the model, and natural-language querying — one lineage, one source of truth.</p>
   </section>
 
+  <section class="slide wide">
+    <div class="kicker">Architecture</div>
+    <h2>Governed, continuously streaming, AI-scored — on one platform</h2>
+    <img src="architecture.png" alt="ICU Step-Down Readiness architecture: MIMIC-III Delta Share and a live vitals replay stream into a continuous Lakeflow medallion (bronze streaming tables, silver with DOB dropped, gold with masked IDs and in-pipeline scores); Mosaic AI trains, registers and serves model v6; pseudonymised gold copies sync to Lakebase; Unity Catalog governs masks, row-level access and PII audit; the Databricks App and Genie serve clinicians." style="width:100%;max-height:68vh;object-fit:contain;margin-top:10px;border-radius:12px">
+    <p class="muted" style="margin-top:12px">Source data streams in continuously; silver drops date of birth; gold carries masked identifiers and live model scores; the app reads pseudonymised Lakebase copies; Unity Catalog governs every layer. Editable source: <code>deck/architecture.drawio</code>.</p>
+  </section>
+
   <section class="slide">
     <div class="kicker">The product</div>
     <h2>A ranked ICU census the care team acts on</h2>
     <div class="two">
       <div>
         <ul>
-          <li><strong>Census dashboard</strong> — every current patient ranked by a relative readiness index, color-banded Ready / Borderline / Not-ready.</li>
+          <li><strong>Census dashboard</strong> — every current patient ranked by a relative readiness index (re-scored within minutes as new vitals stream in), color-banded Ready / Borderline / Not-ready.</li>
           <li><strong>Patient detail</strong> — the factors driving each recommendation, vital-sign trends, and a plain-language <strong>AI clinical summary</strong>.</li>
-          <li><strong>Analytics</strong> — capacity and outcome trends, with honest model performance.</li>
+          <li><strong>Analytics</strong> — capacity and outcome trends, with honest model performance (v6: AUC 0.89 headline, 0.63 readmission-only).</li>
         </ul>
-        <p class="muted">Live: <code>icu-step-down-…databricksapps.com</code></p>
+        <p class="muted">Live: <code>icu-step-down-7474645901826067.aws.databricksapps.com</code></p>
       </div>
       <div class="card">
         <div class="label" style="margin:0 0 10px">Example — ranked census</div>
@@ -129,10 +139,10 @@
     <div class="kicker">For the CMIO &amp; ICU Medical Director</div>
     <h2>Built to be trusted, governed, and operated</h2>
     <div class="grid g2">
-      <div class="card"><strong>Governed by design</strong><p class="muted">Unity Catalog across the medallion — PII classification tags on identifiers, least-privilege grants, and full bronze→gold lineage.</p></div>
-      <div class="card"><strong>Operationally served</strong><p class="muted">Gold features synced to Lakebase (Postgres) for low-latency app reads; model served on Mosaic AI; narrative via the Foundation Model API.</p></div>
-      <div class="card"><strong>Reproducible</strong><p class="muted">Everything deploys via Databricks Asset Bundles; 188 backend + 36 frontend + 18 monitoring/genai tests (+17 live integration), run output committed.</p></div>
-      <div class="card"><strong>Safe by framing</strong><p class="muted">De-identified public data; a relative decision-support index, not an automated discharge gate.</p></div>
+      <div class="card"><strong>Governed by design</strong><p class="muted">Unity Catalog across the medallion — DOB dropped, identifiers pseudonymized via UC column masks, PII classification tags, least-privilege grants, full bronze→gold lineage with continuous audit.</p></div>
+      <div class="card"><strong>Live-fed & operationally served</strong><p class="muted">Continuous Lakeflow streaming pipeline — new vitals in bronze in seconds, scores in ~2 min; pseudonymised gold synced to Lakebase (Postgres) for low-latency app reads; model served on Mosaic AI; narrative via Foundation Model API.</p></div>
+      <div class="card"><strong>Reproducible</strong><p class="muted">Everything deploys via Databricks Asset Bundles; 198 backend + 37 frontend + 68 pipeline/ML unit + 26 live integration tests, run output committed.</p></div>
+      <div class="card"><strong>Safe by framing</strong><p class="muted">Public de-identified MIMIC; a relative decision-support index, not an automated discharge gate.</p></div>
     </div>
   </section>
 
@@ -140,11 +150,11 @@
     <div class="kicker">Model honesty</div>
     <h2>Decision support, not a discharge switch</h2>
     <div class="grid g3">
-      <div class="card"><div class="stat">AUC 0.66</div><div class="label">Honest, modest discrimination on the retrospective feature set</div></div>
-      <div class="card"><div class="stat amber">Index, not %</div><div class="label">Relative readiness rank within the current census — never a "probability of safe discharge"</div></div>
-      <div class="card"><div class="stat">Explainable</div><div class="label">SHAP factors in clinical language; known risks always shown as risks</div></div>
+      <div class="card"><div class="stat">AUC 0.89</div><div class="label">Strong headline discrimination (v2 was 0.66; gain from label fix + 23 new features)</div></div>
+      <div class="card"><div class="stat amber">Readmission-only 0.63</div><div class="label">Predicting 72h bounce-back alone is harder; deaths now labelled separately and honestly</div></div>
+      <div class="card"><div class="stat">Index, not %</div><div class="label">Relative readiness rank within the current census — never a "probability of safe discharge"</div></div>
     </div>
-    <p class="muted" style="margin-top:18px">The roadmap to stronger discrimination: richer real-time features, calibration, and prospective validation with the clinical team.</p>
+    <p class="muted" style="margin-top:18px">Explainable: SHAP factors in clinical language; known risks always shown as risks, and a patient on vasopressors or a ventilator in the last 24h is never banded Ready. The roadmap to stronger readmission discrimination: prospective validation with the clinical team and real-time feature enrichment.</p>
   </section>
 
   <section class="slide">
