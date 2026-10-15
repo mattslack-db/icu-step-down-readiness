@@ -28,8 +28,19 @@
   .arrow{color:var(--muted);font-size:20px}
   .two{display:grid;grid-template-columns:1fr 1fr;gap:28px}
   .tag{display:inline-block;background:#eef2f9;border-radius:999px;padding:4px 12px;font-size:13px;font-weight:600;color:var(--muted);margin:3px 4px 0 0}
-  footer{position:fixed;bottom:14px;left:0;right:0;display:flex;justify-content:space-between;padding:0 22px;font-size:12px;color:var(--muted)}
-  .nav{cursor:pointer;user-select:none}
+  .progress{position:fixed;top:0;left:0;height:3px;background:var(--accent);transition:width .25s ease;z-index:20}
+  .deck-nav{position:fixed;bottom:0;left:0;right:0;display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:12px;padding:10px 18px;background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:blur(6px);border-top:1px solid var(--line);font-size:12px;color:var(--muted);z-index:20}
+  .deck-title{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .deck-controls{display:flex;align-items:center;gap:14px}
+  .deck-btn{display:inline-flex;align-items:center;gap:6px;font:600 13px/1 inherit;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:999px;padding:8px 14px;cursor:pointer}
+  .deck-btn:hover:not(:disabled){border-color:var(--accent);color:var(--accent)}
+  .deck-btn:focus-visible,.dot:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  .deck-btn:disabled{opacity:.35;cursor:default}
+  .dots{display:flex;gap:7px;align-items:center}
+  .dot{width:9px;height:9px;padding:0;border-radius:50%;border:none;background:var(--line);cursor:pointer;transition:transform .15s,background .15s}
+  .dot:hover{background:var(--muted)}
+  .dot[aria-current="step"]{background:var(--accent);transform:scale(1.35)}
+  .counter{justify-self:end;font-variant-numeric:tabular-nums;font-weight:600}
   code{background:#eef2f9;padding:1px 6px;border-radius:6px;font-size:.9em}
   @media(prefers-color-scheme:dark){:root{--ink:#e8eefc;--muted:#9fb0cc;--bg:#0b1220;--card:#131c2e;--line:#243149}}
   @page wide{size:11in 8.5in}
@@ -37,7 +48,7 @@
     :root{--ink:#0b1324;--muted:#5b6b86;--bg:#fff;--card:#fff;--line:#e2e8f2}
     html,body{height:auto;background:#fff}
     #deck{height:auto}
-    footer{display:none}
+    .deck-nav,.progress{display:none}
     .slide{display:flex!important;min-height:auto;height:100vh;page-break-after:always;break-after:page;padding:8vh 8vw;justify-content:center}
     .slide:last-child{page-break-after:auto;break-after:auto}
     .slide.wide{page:wide;padding:0.45in 0.6in;height:auto;min-height:0;box-sizing:border-box}
@@ -170,21 +181,77 @@
 
 </div>
 
-<footer>
-  <span class="nav" onclick="go(-1)">‹ prev</span>
-  <span>ICU Step-Down Readiness · FE Tech Bar</span>
-  <span class="nav" onclick="go(1)">next ›</span>
-</footer>
+<div class="progress" id="progress" aria-hidden="true"></div>
+<nav class="deck-nav" aria-label="Slide navigation">
+  <span class="deck-title">ICU Step-Down Readiness · FE Tech Bar</span>
+  <div class="deck-controls">
+    <button class="deck-btn" id="prev" type="button" aria-label="Previous slide">‹ Prev</button>
+    <div class="dots" id="dots" role="group" aria-label="Go to slide"></div>
+    <button class="deck-btn" id="next" type="button" aria-label="Next slide">Next ›</button>
+  </div>
+  <span class="counter" id="counter" aria-live="polite"></span>
+</nav>
 
 <script>
-  const slides=[...document.querySelectorAll('.slide')];let i=0;
-  function show(n){slides[i].classList.remove('active');i=(n+slides.length)%slides.length;slides[i].classList.add('active');}
-  function go(d){show(i+d);}
-  const FWD=['ArrowRight','ArrowDown','PageDown',' '],BACK=['ArrowLeft','ArrowUp','PageUp'];
-  document.addEventListener('keydown',e=>{
-    if(FWD.includes(e.key)){e.preventDefault();go(1);}
-    else if(BACK.includes(e.key)){e.preventDefault();go(-1);}
+  const slides = [...document.querySelectorAll('.slide')];
+  const total = slides.length;
+  const prevBtn = document.getElementById('prev');
+  const nextBtn = document.getElementById('next');
+  const dotsEl = document.getElementById('dots');
+  const counter = document.getElementById('counter');
+  const progress = document.getElementById('progress');
+  let current = 0;
+
+  // One dot per slide, labelled with the slide's kicker (or heading).
+  const dots = slides.map((slide, n) => {
+    const label = (slide.querySelector('.kicker, h1, h2')?.textContent || `Slide ${n + 1}`).trim();
+    const dot = document.createElement('button');
+    dot.type = 'button';
+    dot.className = 'dot';
+    dot.title = `${n + 1}. ${label}`;
+    dot.setAttribute('aria-label', `Slide ${n + 1}: ${label}`);
+    dot.addEventListener('click', () => show(n));
+    dotsEl.appendChild(dot);
+    return dot;
   });
+
+  function show(n) {
+    const target = Math.max(0, Math.min(total - 1, n));
+    slides[current].classList.remove('active');
+    current = target;
+    slides[current].classList.add('active');
+    dots.forEach((d, k) => (k === current ? d.setAttribute('aria-current', 'step') : d.removeAttribute('aria-current')));
+    prevBtn.disabled = current === 0;
+    nextBtn.disabled = current === total - 1;
+    counter.textContent = `${current + 1} / ${total}`;
+    progress.style.width = `${((current + 1) / total) * 100}%`;
+    if (location.hash !== `#${current + 1}`) history.replaceState(null, '', `#${current + 1}`);
+  }
+
+  function slideFromHash() {
+    const n = parseInt(location.hash.slice(1), 10);
+    return Number.isInteger(n) && n >= 1 && n <= total ? n - 1 : 0;
+  }
+
+  prevBtn.addEventListener('click', () => show(current - 1));
+  nextBtn.addEventListener('click', () => show(current + 1));
+  window.addEventListener('hashchange', () => show(slideFromHash()));
+
+  const FWD = ['ArrowRight', 'ArrowDown', 'PageDown', ' '];
+  const BACK = ['ArrowLeft', 'ArrowUp', 'PageUp'];
+  document.addEventListener('keydown', e => {
+    // Space/Enter on a focused button already "clicks" it — don't advance twice.
+    if (e.target instanceof HTMLButtonElement && (e.key === ' ' || e.key === 'Enter')) return;
+    if (FWD.includes(e.key)) { e.preventDefault(); show(current + 1); }
+    else if (BACK.includes(e.key)) { e.preventDefault(); show(current - 1); }
+    else if (e.key === 'Home') { e.preventDefault(); show(0); }
+    else if (e.key === 'End') { e.preventDefault(); show(total - 1); }
+  });
+
+  slides.forEach(s => s.classList.remove('active'));
+  slides[0].classList.add('active');
+  current = 0;
+  show(slideFromHash());
 </script>
 </body>
 </html>
