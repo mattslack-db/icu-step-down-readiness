@@ -550,18 +550,24 @@ AS SELECT * FROM patient_features_base;
 -- ---------------------------------------------------------------------------
 -- gold.readiness_training_set
 --
--- Label (v3): safe step-down = left the ICU ALIVE and NOT readmitted within 72h.
---   readiness_label = 1  → OUTTIME IS NOT NULL, no subsequent ICU stay within
---       72h of OUTTIME, and no death (in the ICU or within 72h of OUTTIME)
---   readiness_label = 0  → still in ICU, OR bounced back within 72h, OR died
---       in the ICU / within 72h of leaving it
---   label_reason records which rule fired (safe / bounce_back / death /
---   still_in_icu) so evaluation can report readmission-only performance too.
+-- Label (v4): safe step-down = left the ICU ALIVE and NOT readmitted within 72h.
+--   Cohort  → stays that LEFT THE ICU ALIVE — the only stays where a step-down
+--       decision was actually made. Excluded: 'died_in_icu' (death at or before
+--       OUTTIME + 1h) and 'still_in_icu' (no OUTTIME).
+--   readiness_label = 1  → no subsequent ICU stay within 72h of OUTTIME and no
+--       death within 72h of OUTTIME
+--   readiness_label = 0  → bounced back within 72h, OR died within 72h of
+--       leaving the ICU
+--   label_reason records which rule fired (safe / bounce_back / death) so
+--   evaluation can report readmission-only performance too.
 --
--- v2 defect fixed here: deaths left the ICU (OUTTIME set) and were never
--- readmitted, so ~5,274 deaths were labelled "safe step-down" — almost 3x the
--- true negative count. Death time = admissions.DEATHTIME, falling back to
--- patients.DOD (date only) for deaths after hospital discharge.
+-- v2 defect: deaths left the ICU (OUTTIME set) and were never readmitted, so
+-- ~5,274 deaths were labelled "safe step-down". v3 relabelled them not-safe —
+-- but 4,622 of the 5,521 were deaths IN the ICU, whose last-24h window is the
+-- last day of life. Separating those from survivors is easy and not a step-down
+-- decision: it inflated test AUC from ~0.72 to 0.89. v4 drops them.
+-- Death time = admissions.DEATHTIME, falling back to patients.DOD (date only)
+-- for deaths after hospital discharge.
 --
 -- Self-join is on subject_id; the 72h window is the standard ICU readmission
 -- threshold used in clinical literature for "unplanned readmission."
@@ -649,6 +655,7 @@ outcomes AS (
     si.icustay_id,
     CASE
       WHEN si.outtime IS NULL THEN 'still_in_icu'
+      WHEN si.deathtime <= si.outtime + INTERVAL 1 HOUR THEN 'died_in_icu'
       WHEN COALESCE(si.deathtime, p.dod) <= si.outtime + INTERVAL 72 HOURS THEN 'death'
       WHEN bb.icustay_id IS NOT NULL THEN 'bounce_back'
       ELSE 'safe'
@@ -669,7 +676,8 @@ JOIN outcomes o
 -- Current (live-cohort) patients are scored, never trained on: keeps the
 -- census out-of-sample and keeps partially replayed windows out of training.
 LEFT ANTI JOIN icu_step_down.landing.live_cohort lc
-  ON lc.icustay_id = pf.icustay_id;
+  ON lc.icustay_id = pf.icustay_id
+WHERE o.label_reason NOT IN ('died_in_icu', 'still_in_icu');
 
 -- ---------------------------------------------------------------------------
 -- gold.census
@@ -827,6 +835,9 @@ FROM patient_features_base;
 -- census_scores_governed) — never from historical outcome labels.
 -- No identifiers beyond icustay_id. Feature list must match src/ml/model.py
 -- FEATURE_COLS (enforced by tests/ml/test_feature_parity.py).
+-- Missing features are sent as NaN, not NULL: ai_query serialises a NULL
+-- field as 0, which the model reads as a real value (GCS 0 = deepest coma) and
+-- mis-scores the patient. LightGBM treats NaN as missing — as the app does.
 -- ---------------------------------------------------------------------------
 CREATE OR REFRESH MATERIALIZED VIEW icu_step_down.gold.census_scores
 COMMENT 'Live census scored by the served readiness model in the pipeline: score, relative index (0-100) and band.'
@@ -842,59 +853,59 @@ WITH scored AS (
     ai_query(
       'icu-readiness',
       named_struct(
-        'hr_mean', CAST(hr_mean AS DOUBLE),
-        'hr_min', CAST(hr_min AS DOUBLE),
-        'hr_max', CAST(hr_max AS DOUBLE),
-        'hr_last', CAST(hr_last AS DOUBLE),
-        'sbp_mean', CAST(sbp_mean AS DOUBLE),
-        'sbp_min', CAST(sbp_min AS DOUBLE),
-        'sbp_max', CAST(sbp_max AS DOUBLE),
-        'sbp_last', CAST(sbp_last AS DOUBLE),
-        'dbp_mean', CAST(dbp_mean AS DOUBLE),
-        'dbp_min', CAST(dbp_min AS DOUBLE),
-        'dbp_max', CAST(dbp_max AS DOUBLE),
-        'dbp_last', CAST(dbp_last AS DOUBLE),
-        'spo2_mean', CAST(spo2_mean AS DOUBLE),
-        'spo2_min', CAST(spo2_min AS DOUBLE),
-        'spo2_max', CAST(spo2_max AS DOUBLE),
-        'spo2_last', CAST(spo2_last AS DOUBLE),
-        'temp_c_mean', CAST(temp_c_mean AS DOUBLE),
-        'temp_c_min', CAST(temp_c_min AS DOUBLE),
-        'temp_c_max', CAST(temp_c_max AS DOUBLE),
-        'temp_c_last', CAST(temp_c_last AS DOUBLE),
-        'rr_mean', CAST(rr_mean AS DOUBLE),
-        'rr_min', CAST(rr_min AS DOUBLE),
-        'rr_max', CAST(rr_max AS DOUBLE),
-        'rr_last', CAST(rr_last AS DOUBLE),
-        'on_vasopressors', CAST(on_vasopressors AS DOUBLE),
-        'on_ventilator', CAST(on_ventilator AS DOUBLE),
-        'gcs_last', CAST(gcs_last AS DOUBLE),
-        'lactate_last', CAST(lactate_last AS DOUBLE),
-        'los', CAST(los AS DOUBLE),
-        'age', CAST(age AS DOUBLE),
-        'hr_std', CAST(hr_std AS DOUBLE),
-        'sbp_std', CAST(sbp_std AS DOUBLE),
-        'rr_std', CAST(rr_std AS DOUBLE),
-        'spo2_std', CAST(spo2_std AS DOUBLE),
-        'n_vital_obs', CAST(n_vital_obs AS DOUBLE),
-        'creatinine_last', CAST(creatinine_last AS DOUBLE),
-        'bun_last', CAST(bun_last AS DOUBLE),
-        'wbc_last', CAST(wbc_last AS DOUBLE),
-        'hemoglobin_last', CAST(hemoglobin_last AS DOUBLE),
-        'platelets_last', CAST(platelets_last AS DOUBLE),
-        'bicarbonate_last', CAST(bicarbonate_last AS DOUBLE),
-        'sodium_last', CAST(sodium_last AS DOUBLE),
-        'potassium_last', CAST(potassium_last AS DOUBLE),
-        'glucose_last', CAST(glucose_last AS DOUBLE),
-        'urine_output_24h', CAST(urine_output_24h AS DOUBLE),
-        'vasopressors_24h', CAST(vasopressors_24h AS DOUBLE),
-        'ventilated_24h', CAST(ventilated_24h AS DOUBLE),
-        'prior_icu_stays', CAST(prior_icu_stays AS DOUBLE),
-        'is_emergency_admit', CAST(is_emergency_admit AS DOUBLE),
-        'hours_admit_to_icu', CAST(hours_admit_to_icu AS DOUBLE),
-        'is_surgical_unit', CAST(is_surgical_unit AS DOUBLE),
-        'is_cardiac_unit', CAST(is_cardiac_unit AS DOUBLE),
-        'is_male', CAST(is_male AS DOUBLE)
+        'hr_mean', COALESCE(CAST(hr_mean AS DOUBLE), CAST('NaN' AS DOUBLE)),
+        'hr_min', COALESCE(CAST(hr_min AS DOUBLE), CAST('NaN' AS DOUBLE)),
+        'hr_max', COALESCE(CAST(hr_max AS DOUBLE), CAST('NaN' AS DOUBLE)),
+        'hr_last', COALESCE(CAST(hr_last AS DOUBLE), CAST('NaN' AS DOUBLE)),
+        'sbp_mean', COALESCE(CAST(sbp_mean AS DOUBLE), CAST('NaN' AS DOUBLE)),
+        'sbp_min', COALESCE(CAST(sbp_min AS DOUBLE), CAST('NaN' AS DOUBLE)),
+        'sbp_max', COALESCE(CAST(sbp_max AS DOUBLE), CAST('NaN' AS DOUBLE)),
+        'sbp_last', COALESCE(CAST(sbp_last AS DOUBLE), CAST('NaN' AS DOUBLE)),
+        'dbp_mean', COALESCE(CAST(dbp_mean AS DOUBLE), CAST('NaN' AS DOUBLE)),
+        'dbp_min', COALESCE(CAST(dbp_min AS DOUBLE), CAST('NaN' AS DOUBLE)),
+        'dbp_max', COALESCE(CAST(dbp_max AS DOUBLE), CAST('NaN' AS DOUBLE)),
+        'dbp_last', COALESCE(CAST(dbp_last AS DOUBLE), CAST('NaN' AS DOUBLE)),
+        'spo2_mean', COALESCE(CAST(spo2_mean AS DOUBLE), CAST('NaN' AS DOUBLE)),
+        'spo2_min', COALESCE(CAST(spo2_min AS DOUBLE), CAST('NaN' AS DOUBLE)),
+        'spo2_max', COALESCE(CAST(spo2_max AS DOUBLE), CAST('NaN' AS DOUBLE)),
+        'spo2_last', COALESCE(CAST(spo2_last AS DOUBLE), CAST('NaN' AS DOUBLE)),
+        'temp_c_mean', COALESCE(CAST(temp_c_mean AS DOUBLE), CAST('NaN' AS DOUBLE)),
+        'temp_c_min', COALESCE(CAST(temp_c_min AS DOUBLE), CAST('NaN' AS DOUBLE)),
+        'temp_c_max', COALESCE(CAST(temp_c_max AS DOUBLE), CAST('NaN' AS DOUBLE)),
+        'temp_c_last', COALESCE(CAST(temp_c_last AS DOUBLE), CAST('NaN' AS DOUBLE)),
+        'rr_mean', COALESCE(CAST(rr_mean AS DOUBLE), CAST('NaN' AS DOUBLE)),
+        'rr_min', COALESCE(CAST(rr_min AS DOUBLE), CAST('NaN' AS DOUBLE)),
+        'rr_max', COALESCE(CAST(rr_max AS DOUBLE), CAST('NaN' AS DOUBLE)),
+        'rr_last', COALESCE(CAST(rr_last AS DOUBLE), CAST('NaN' AS DOUBLE)),
+        'on_vasopressors', COALESCE(CAST(on_vasopressors AS DOUBLE), CAST('NaN' AS DOUBLE)),
+        'on_ventilator', COALESCE(CAST(on_ventilator AS DOUBLE), CAST('NaN' AS DOUBLE)),
+        'gcs_last', COALESCE(CAST(gcs_last AS DOUBLE), CAST('NaN' AS DOUBLE)),
+        'lactate_last', COALESCE(CAST(lactate_last AS DOUBLE), CAST('NaN' AS DOUBLE)),
+        'los', COALESCE(CAST(los AS DOUBLE), CAST('NaN' AS DOUBLE)),
+        'age', COALESCE(CAST(age AS DOUBLE), CAST('NaN' AS DOUBLE)),
+        'hr_std', COALESCE(CAST(hr_std AS DOUBLE), CAST('NaN' AS DOUBLE)),
+        'sbp_std', COALESCE(CAST(sbp_std AS DOUBLE), CAST('NaN' AS DOUBLE)),
+        'rr_std', COALESCE(CAST(rr_std AS DOUBLE), CAST('NaN' AS DOUBLE)),
+        'spo2_std', COALESCE(CAST(spo2_std AS DOUBLE), CAST('NaN' AS DOUBLE)),
+        'n_vital_obs', COALESCE(CAST(n_vital_obs AS DOUBLE), CAST('NaN' AS DOUBLE)),
+        'creatinine_last', COALESCE(CAST(creatinine_last AS DOUBLE), CAST('NaN' AS DOUBLE)),
+        'bun_last', COALESCE(CAST(bun_last AS DOUBLE), CAST('NaN' AS DOUBLE)),
+        'wbc_last', COALESCE(CAST(wbc_last AS DOUBLE), CAST('NaN' AS DOUBLE)),
+        'hemoglobin_last', COALESCE(CAST(hemoglobin_last AS DOUBLE), CAST('NaN' AS DOUBLE)),
+        'platelets_last', COALESCE(CAST(platelets_last AS DOUBLE), CAST('NaN' AS DOUBLE)),
+        'bicarbonate_last', COALESCE(CAST(bicarbonate_last AS DOUBLE), CAST('NaN' AS DOUBLE)),
+        'sodium_last', COALESCE(CAST(sodium_last AS DOUBLE), CAST('NaN' AS DOUBLE)),
+        'potassium_last', COALESCE(CAST(potassium_last AS DOUBLE), CAST('NaN' AS DOUBLE)),
+        'glucose_last', COALESCE(CAST(glucose_last AS DOUBLE), CAST('NaN' AS DOUBLE)),
+        'urine_output_24h', COALESCE(CAST(urine_output_24h AS DOUBLE), CAST('NaN' AS DOUBLE)),
+        'vasopressors_24h', COALESCE(CAST(vasopressors_24h AS DOUBLE), CAST('NaN' AS DOUBLE)),
+        'ventilated_24h', COALESCE(CAST(ventilated_24h AS DOUBLE), CAST('NaN' AS DOUBLE)),
+        'prior_icu_stays', COALESCE(CAST(prior_icu_stays AS DOUBLE), CAST('NaN' AS DOUBLE)),
+        'is_emergency_admit', COALESCE(CAST(is_emergency_admit AS DOUBLE), CAST('NaN' AS DOUBLE)),
+        'hours_admit_to_icu', COALESCE(CAST(hours_admit_to_icu AS DOUBLE), CAST('NaN' AS DOUBLE)),
+        'is_surgical_unit', COALESCE(CAST(is_surgical_unit AS DOUBLE), CAST('NaN' AS DOUBLE)),
+        'is_cardiac_unit', COALESCE(CAST(is_cardiac_unit AS DOUBLE), CAST('NaN' AS DOUBLE)),
+        'is_male', COALESCE(CAST(is_male AS DOUBLE), CAST('NaN' AS DOUBLE))
       ),
       returnType => 'STRING'
     ) AS prediction

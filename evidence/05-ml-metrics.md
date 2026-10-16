@@ -1,8 +1,84 @@
-# Phase 5 — ML Metrics (current: **v6**)
+# Phase 5 — ML Metrics (current: **v7**)
 
-> **v6 is the served model** (`icu_step_down.ml.readiness_model` version 6, endpoint
-> `icu-readiness`). The v2 record below is kept for comparison — it explains why the
-> headline AUC moved from 0.66 to 0.89.
+> **v7 is the served model** (`icu_step_down.ml.readiness_model` version 7, endpoint
+> `icu-readiness`). The v6 and v2 records below are kept for comparison — they
+> explain why the headline AUC went 0.66 → 0.89 → **0.74**, and why 0.74 is the
+> honest number.
+
+## What changed from v6 → v7
+
+| Change | Why |
+|---|---|
+| **Cohort: stays that left the ICU alive** (pipeline excludes `died_in_icu` — death at or before ICU `outtime` + 1h — and `still_in_icu`) | 4,622 of v6's 5,521 "death" labels (83.7%) were deaths **in** the ICU. Their last-24h feature window is the last day of life — easy to separate from survivors, and not a step-down decision. It inflated test AUC from ~0.72 to 0.89 |
+| **Shallower, more regularised trees** (`num_leaves` 15, `min_child_samples` 100, `learning_rate` 0.03, early stopping up to 2,000 trees) | Beat the v6 settings by ~0.015 AUC on the honest cohort in offline experiments |
+| **95% bootstrap CIs** on AUC and readmission-only AUC (1,000 resamples of TEST) | ~530 not-safe stays in TEST: AUC moves ±0.02, so single-run differences below that are noise |
+
+Offline experiments that led here (same features, split and seed; nothing
+registered) are in [`ml-cohort-experiment.md`](ml-cohort-experiment.md).
+
+## v7 training run
+
+| Field | Value |
+|---|---|
+| MLflow run_id | `fed422ea54b64609bd4546bbd7c5aae8` |
+| Job | `icu-readiness-train` (resources/jobs.yml) — notebook `src/ml/train.py`, run 2026-10-16 |
+| Training table | `icu_step_down.gold.readiness_training_set` — **56,860** stays that left the ICU alive (live cohort excluded) |
+| Label balance | 54,195 safe / 2,665 not safe (**4.7%**) — 1,766 bounce-backs, 899 deaths within 72h of leaving the ICU |
+| Split | 3-way stratified 64/16/20, early stopping on VAL, TEST touched once |
+| Registered | version **7**, alias `@prod`; serving pinned to `entity_version: "7"` |
+
+## v7 evaluation (held-out TEST, n = 11,372)
+
+| Metric | v7 | 95% CI | Note |
+|---|---|---|---|
+| **AUC** | **0.735** | 0.714–0.757 | Safe step-down vs readmission or death within 72h of leaving the ICU |
+| AUC — v2 feature set, same cohort | 0.693 | — | The 23 v3 features add ~0.04 |
+| **AUC — readmission-only** (post-ICU deaths excluded) | **0.643** | 0.614–0.673 | Bounce-back alone is hard; typical structured-data results on MIMIC are ~0.65–0.75 |
+| PR-AUC (not safe) | **0.230** | — | vs 4.7% base rate — ~4.9× lift |
+| Precision / recall (not safe) @0.5 | 0.116 / 0.554 | — | Threshold is not used by the app: it shows a relative rank |
+
+Confusion matrix at 0.5 (rows = actual, cols = predicted; order 0 = not safe / 1 = safe):
+
+```
+                    Predicted 0    Predicted 1
+Actual 0 (not safe)    295 (TN)      238 (FP)
+Actual 1 (safe)      2,239 (FN)    8,600 (TP)
+```
+
+TEST label_reason: safe 10,839 · bounce_back 362 · death 171.
+
+**How to read it:** v7 ranks patients who left the ICU alive by their risk of
+a 72h bounce-back or death, at about 5× the base rate in the riskiest tail.
+That's useful for prioritising who to review on rounds, and not good enough to
+gate a discharge. The pilot plan validates it on the customer's own patients
+(retrospectively, then silently on live patients) before clinicians use it.
+
+## v7 SHAP global importance (mean |SHAP|, TEST sample n = 500)
+
+| Rank | Feature | Mean \|SHAP\| |
+|---|---|---|
+| 1 | `age` | 0.2747 |
+| 2 | `bun_last` | 0.2043 |
+| 3 | `urine_output_24h` | 0.1356 |
+| 4 | `gcs_last` | 0.0934 |
+| 5 | `los` | 0.0773 |
+| 6 | `hours_admit_to_icu` | 0.0609 |
+| 7 | `hr_last` | 0.0605 |
+| 8 | `lactate_last` | 0.0598 |
+| 9 | `wbc_last` | 0.0583 |
+| 10 | `sodium_last` | 0.0561 |
+
+`ventilated_24h` falls from 5th (v6, 0.189) to 26th (0.017). In v6 it mostly
+identified patients who died on the ventilator. GCS falls from 1st to 4th for
+the same reason. The life-support guardrail still caps any patient ventilated
+or on pressors in the last 24h at Borderline, whatever the model says.
+
+---
+
+# Historical record — v6 (superseded: included in-ICU deaths)
+
+> v6's 0.891 AUC is **not** a valid step-down metric: 84% of its "death" labels
+> were deaths in the ICU (see v7 above). Kept for the audit trail.
 
 ## What changed from v2 → v6
 

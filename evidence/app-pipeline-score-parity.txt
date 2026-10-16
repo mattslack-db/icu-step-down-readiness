@@ -1,0 +1,59 @@
+# App vs pipeline score parity — model v7
+# Captured: 2026-10-16T10:41:50Z  |  profile: icu-sandbox
+# App:      GET /api/census (Lakebase features -> icu-readiness endpoint v7)
+# Pipeline: icu_step_down.gold.census_scores (ai_query -> icu-readiness endpoint v7)
+#
+# Bug found and fixed while capturing this (2026-10-16): ai_query sent NULL features
+# to the model as 0. Patient 245383 has no GCS charted: the app (missing) scored
+# 0.584, the pipeline (GCS 0) scored 0.148. Before the fix, 36 of 40 census
+# patients differed in score or index. gold.sql now sends missing features as NaN (LightGBM's
+# missing value); tests/ml/test_feature_parity.py guards it.
+# A second, cosmetic difference: app index (rank/n)*100 gave 57.4999.. -> 57 where
+# the pipeline's exact BROUND(57.5) gave 58; app now computes 100*rank/n.
+
+pipeline bands: {'Borderline': 20, 'Ready': 6, 'Not ready': 14}
+app bands:      {'Borderline': 20, 'Ready': 6, 'Not ready': 14}
+Ready while on life support (24h): 0
+patients compared: 40  |  mismatches (band, score ±0.001, index): 0
+
+icustay_id pipe_band    pipe_score pipe_idx   app_band     app_score app_idx  life_support_24h
+216425     Borderline       0.8919       98   Borderline      0.8919      98  true
+204377     Borderline       0.8495       95   Borderline      0.8495      95  true
+259604     Borderline       0.7799       92   Borderline      0.7799      92  true
+291413     Ready            0.7658       90   Ready           0.7658      90  false
+238331     Borderline       0.7300       88   Borderline      0.7300      88  true
+221952     Ready            0.7230       85   Ready           0.7230      85  false
+281632     Borderline       0.7072       82   Borderline      0.7072      82  true
+210081     Ready            0.6989       80   Ready           0.6989      80  false
+201642     Ready            0.6986       78   Ready           0.6986      78  false
+216898     Ready            0.6940       75   Ready           0.6940      75  false
+280623     Ready            0.6921       72   Ready           0.6921      72  false
+237107     Borderline       0.6903       70   Borderline      0.6903      70  true
+287070     Borderline       0.6835       68   Borderline      0.6835      68  true
+219673     Borderline       0.6790       65   Borderline      0.6790      65  false
+243012     Borderline       0.6755       62   Borderline      0.6755      62  false
+281499     Borderline       0.6534       60   Borderline      0.6534      60  false
+240599     Borderline       0.6447       58   Borderline      0.6447      58  false
+290671     Borderline       0.6263       55   Borderline      0.6263      55  false
+298645     Borderline       0.6226       52   Borderline      0.6226      52  false
+274142     Borderline       0.6151       50   Borderline      0.6151      50  false
+240447     Borderline       0.6131       48   Borderline      0.6131      48  false
+252285     Borderline       0.6123       45   Borderline      0.6123      45  false
+225773     Borderline       0.6070       42   Borderline      0.6070      42  false
+214324     Borderline       0.6020       40   Borderline      0.6020      40  false
+222908     Borderline       0.5950       38   Borderline      0.5950      38  false
+207879     Borderline       0.5949       35   Borderline      0.5949      35  false
+210168     Not ready        0.5873       32   Not ready       0.5873      32  false
+272431     Not ready        0.5844       30   Not ready       0.5844      30  true
+245383     Not ready        0.5836       28   Not ready       0.5836      28  false
+246190     Not ready        0.5808       25   Not ready       0.5808      25  false
+244799     Not ready        0.5709       22   Not ready       0.5709      22  false
+248495     Not ready        0.5270       20   Not ready       0.5270      20  false
+236817     Not ready        0.5099       18   Not ready       0.5099      18  false
+257302     Not ready        0.4805       15   Not ready       0.4805      15  false
+263240     Not ready        0.4135       12   Not ready       0.4135      12  false
+236339     Not ready        0.3978       10   Not ready       0.3978      10  false
+210785     Not ready        0.3318        8   Not ready       0.3318       8  true
+298956     Not ready        0.3302        5   Not ready       0.3302       5  false
+224403     Not ready        0.3023        2   Not ready       0.3023       2  false
+290166     Not ready        0.2858        0   Not ready       0.2858       0  false

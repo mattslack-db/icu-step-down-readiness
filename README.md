@@ -17,10 +17,10 @@ Headline results, as committed text:
 
 - **Lakeflow pipeline run — COMPLETED**, bronze→gold row counts: bronze `admissions 58,976` / `chart_events 38,776,289` / `lab_events 27,854,055` → gold `patient_features 61,532`, `readiness_training_set 61,532`, `census 40`. ([`evidence/pipeline-run.txt`](evidence/pipeline-run.txt))
 - **Query against governed gold tables:** census cohort n=40, avg LOS 2.83d, 8 on pressors / 11 on vent; training label balance 59,706 ready / 1,826 not-ready. ([`evidence/gold-queries.txt`](evidence/gold-queries.txt))
-- **Real served prediction** (Mosaic AI `icu-readiness`; captured on model v2 — the endpoint now serves v6): `readiness_score 0.4739` with factors `lactate_last (risk 0.262)`, `on_ventilator (risk 0.030)`, … — `on_ventilator` shown as **risk** (safety override, live). ([`evidence/serving-prediction.txt`](evidence/serving-prediction.txt))
+- **Real served prediction** (Mosaic AI `icu-readiness`; captured on model v2 — the endpoint now serves v7): `readiness_score 0.4739` with factors `lactate_last (risk 0.262)`, `on_ventilator (risk 0.030)`, … — `on_ventilator` shown as **risk** (safety override, live). ([`evidence/serving-prediction.txt`](evidence/serving-prediction.txt))
 - **Genie Q&A** over the governed tables: *"How many current ICU patients are ready for step-down?"* → generated SQL → `ready=38, not_ready=2, total=40`. ([`evidence/genie-qa.txt`](evidence/genie-qa.txt))
 - **Deployed app RUNNING** + Lakebase synced tables ONLINE; **drift job** PSI 2.15 / KS 0.22; **unit-access** scoped predicate returns 15 MICU rows live. ([`evidence/app-deploy.txt`](evidence/app-deploy.txt), [`evidence/drift-run.txt`](evidence/drift-run.txt), [`evidence/unit-access-verification.txt`](evidence/unit-access-verification.txt))
-- **Test suites passing:** 198 backend + 37 frontend + 68 pipeline/ML unit + 26 live integration = **329 passing** — committed run output in [`evidence/test-run.log`](evidence/test-run.log).
+- **Test suites passing:** 199 backend + 38 frontend + 69 pipeline/ML unit + 27 live integration = **333 passing** — committed run output in [`evidence/test-run.log`](evidence/test-run.log).
 
 **Want the transformation logic end to end?** The full bronze→silver→gold medallion SQL and the Genie space configuration are reproduced readably in **[`DATA-JOURNEY.md`](DATA-JOURNEY.md)** (source in [`src/pipelines/`](src/pipelines/) and [`src/genie/`](src/genie/)).
 
@@ -82,7 +82,7 @@ flowchart LR
 | Surface | Databricks App (React + FastAPI) | Census dashboard, patient detail, analytics | [07-app-api](evidence/07-app-api.md) · [07-app-deploy](evidence/07-app-deploy.md) |
 | Provision | FEVM + DABs | AWS serverless sandbox; all assets via Asset Bundles | [00-provisioning](evidence/00-provisioning.md) |
 | Data access | Delta Sharing | Cross-metastore D2D share of the source | [01-data-access](evidence/01-data-access.md) |
-| Tests | pytest + vitest | 198 backend + 37 frontend + 68 pipeline/ML unit + 26 live integration — run output in [`evidence/test-run.log`](evidence/test-run.log) | [08-tests](evidence/08-tests.md) |
+| Tests | pytest + vitest | 199 backend + 38 frontend + 69 pipeline/ML unit + 27 live integration — run output in [`evidence/test-run.log`](evidence/test-run.log) | [08-tests](evidence/08-tests.md) |
 
 All evidence files contain **committed, text-readable run output** (row counts, query results, model metrics, deploy logs) — not screenshots.
 
@@ -154,7 +154,7 @@ databricks bundle run icu_live_vitals_replay -t sandbox --profile icu-sandbox --
 # 4. After the pipeline's first pass: governance.sql + row_level_security.sql,
 #    then python src/lakebase/sync_tables.py --profile icu-sandbox --wait
 
-# Train the model (alternative to using the pre-trained v6)
+# Train the model (alternative to using the pre-trained v7)
 databricks bundle run icu_readiness_train -t sandbox --profile icu-sandbox
 ```
 
@@ -183,13 +183,14 @@ Operational notes before enabling `enforce_unit_access` (verify live — the san
 
 ## Model honesty
 
-The readiness model (LightGBM on 53 vital/lab/status/history features) predicts safe step-down (left ICU alive, no readmission within 72h, no death within 72h). It is intentionally framed as a **relative ranking / decision-support** tool:
+The readiness model (LightGBM on 53 vital/lab/status/history features) predicts safe step-down for patients who **left the ICU alive**: no ICU readmission and no death within 72h of leaving. Patients who died in the ICU are excluded. They were never step-down decisions, and including them (v6) inflated AUC to 0.89. It is intentionally framed as a **relative ranking / decision-support** tool:
 
-- **Headline AUC 0.891** — test-set discrimination after label fix and new feature engineering (v2 was 0.659).
-- **Readmission-only AUC 0.635** — predicting 72h bounce-back alone remains hard; deaths are now separated and labelled honestly.
-- **Not-safe PR-AUC 0.776** (base rate 11.9%) — strong separation of the discharge-risk tail. Label fix was the largest contributor to v2→v6 gain (was 0.062 with only bounce-backs).
+- **AUC 0.735** (95% CI 0.714–0.757) on held-out stays that left the ICU alive (56,860-stay cohort, 4.7% not safe).
+- **Readmission-only AUC 0.643** (95% CI 0.614–0.673) — predicting 72h bounce-back alone is hard from structured data.
+- **Not-safe PR-AUC 0.230** vs a 4.7% base rate (~5× lift in the riskiest tail).
+- How v6's 0.89 was found to be inflated, and what didn't help (trend features, a bounce-back-only target): [`evidence/ml-cohort-experiment.md`](evidence/ml-cohort-experiment.md).
 - The app shows a **relative readiness index (0–100, percentile within the current census)** and Ready/Borderline/Not-ready bands — **never** a calibrated "probability of safe discharge."
-- SHAP factors are mapped to clinical labels; known-risk features (on vasopressors/ventilator) are always presented as risks. **Safety guardrail:** a patient on vasopressors or a ventilator in the last 24h is never banded *Ready* — capped at *Borderline* with the life-support risk listed first, in the app and in the pipeline's `gold.census_scores` (so Genie agrees). See `app/src/icu_step_down/backend/lib/guardrails.py`. See [`evidence/05-ml-metrics.md`](evidence/05-ml-metrics.md) for full v6 details.
+- SHAP factors are mapped to clinical labels; known-risk features (on vasopressors/ventilator) are always presented as risks. **Safety guardrail:** a patient on vasopressors or a ventilator in the last 24h is never banded *Ready* — capped at *Borderline* with the life-support risk listed first, in the app and in the pipeline's `gold.census_scores` (so Genie agrees). See `app/src/icu_step_down/backend/lib/guardrails.py`. See [`evidence/05-ml-metrics.md`](evidence/05-ml-metrics.md) for full v7 details.
 
 ## Presentation deck
 

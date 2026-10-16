@@ -45,23 +45,23 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api", tags=["analytics"])
 
 # ---------------------------------------------------------------------------
-# Global feature importance from v6 model evaluation (evidence/05-ml-metrics.md).
+# Global feature importance from v7 model evaluation (evidence/05-ml-metrics.md).
 # Mean |SHAP| values on held-out test set (n=500 sample), MLflow run
-# b20ebd538eb74184b139ea061b292506 (shap_global_importance.csv).
+# fed422ea54b64609bd4546bbd7c5aae8 (shap_global_importance.csv).
 # These are fixed — the model version is pinned.
 # ---------------------------------------------------------------------------
 
 _GLOBAL_FEATURE_IMPORTANCE: list[tuple[str, float]] = [
-    ("gcs_last", 0.29696),
-    ("urine_output_24h", 0.24010),
-    ("age", 0.22405),
-    ("bun_last", 0.20116),
-    ("ventilated_24h", 0.18911),
-    ("sbp_last", 0.13688),
-    ("los", 0.10693),
-    ("lactate_last", 0.10621),
-    ("wbc_last", 0.09338),
-    ("hours_admit_to_icu", 0.08467),
+    ("age", 0.27475),
+    ("bun_last", 0.20430),
+    ("urine_output_24h", 0.13561),
+    ("gcs_last", 0.09339),
+    ("los", 0.07727),
+    ("hours_admit_to_icu", 0.06088),
+    ("hr_last", 0.06047),
+    ("lactate_last", 0.05977),
+    ("wbc_last", 0.05833),
+    ("sodium_last", 0.05613),
 ]
 
 # Analytics SQL: icustay_id + all FEATURE_COLS (which already include los,

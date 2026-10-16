@@ -7,19 +7,18 @@
 #   (1 root skip = mlflow-only equality check when mlflow is not installed locally;
 #    3 integration skips = census vitals non-null checks, deferred until the live replay completes)
 
-# Test run — captured 2026-10-12T19:43:53Z (v6 model, PII masking, streaming, life-support guardrail)
+# Test run — captured 2026-10-16T10:50:37Z (v7 model: left-ICU-alive cohort, ai_query NaN fix, index rounding fix)
 
 ## Backend (app) — cd app && uv run pytest
-............................................                             [100%]
-198 passed in 1.32s
+199 passed in 1.37s
 
 ## Frontend (app) — cd app && bunx vitest run
- Test Files  3 passed (3)
-      Tests  37 passed (37)
+Test Files  3 passed (3)
+      Tests  38 passed (38)
 
 ## Root unit suites — pytest tests -m 'not integration' (ml parity, monitoring, genai, streaming)
-68 passed, 1 skipped, 29 deselected in 1.04s
+69 passed, 1 skipped, 30 deselected in 0.73s
 
 ## Live integration — pytest tests/integration -m integration (icu-sandbox warehouse)
-SKIPPED [3] ../tests/integration/test_pipeline.py:267: live replay in progress (13.0h of 24h released)
-26 passed, 3 skipped in 36.17s
+SKIPPED [3] ../tests/integration/test_pipeline.py:274: live replay in progress (13.0h of 24h released)
+27 passed, 3 skipped in 24.58s

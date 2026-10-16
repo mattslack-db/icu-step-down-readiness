@@ -2,19 +2,23 @@
 # MAGIC %md
 # MAGIC # ICU Step-Down Readiness — LightGBM Training
 # MAGIC
-# MAGIC **v3** — train a binary classifier on
+# MAGIC **Model v7** — train a binary classifier on
 # MAGIC `icu_step_down.gold.readiness_training_set`, explain it with SHAP, wrap it in a
 # MAGIC MLflow pyfunc, and register to UC.
 # MAGIC
 # MAGIC | Label | Meaning |
 # MAGIC |-------|---------|
-# MAGIC | 1 | Safe step-down: left the ICU alive, no readmission or death within 72 h |
-# MAGIC | 0 | Not safe: ICU readmission **or death** within 72 h (v2 counted deaths as safe) |
+# MAGIC | 1 | Safe step-down: no ICU readmission and no death within 72 h of leaving the ICU |
+# MAGIC | 0 | Not safe: ICU readmission **or death** within 72 h of leaving the ICU |
 # MAGIC
-# MAGIC v3 also reports (a) a baseline trained on the v2 feature set with the v3
-# MAGIC label — isolating the label fix from the new features — and (b) AUC on the
-# MAGIC readmission-only subset (deaths excluded), so the headline isn't carried by
-# MAGIC mortality alone.
+# MAGIC **Cohort**: stays that left the ICU **alive** — the only stays where a
+# MAGIC step-down decision was made. Deaths *in* the ICU are excluded by the
+# MAGIC pipeline: their last-24h window is the last day of life, and including them
+# MAGIC (v6) inflated test AUC from ~0.72 to 0.89.
+# MAGIC
+# MAGIC Also reported: (a) a baseline on the v2 feature set, (b) AUC on the
+# MAGIC readmission-only subset (post-ICU deaths excluded), and (c) 95 % bootstrap
+# MAGIC confidence intervals — with ~530 not-safe stays in TEST, AUC moves ±0.02.
 # MAGIC
 # MAGIC **Class imbalance**: `class_weight="balanced"` — minority bounce-back class
 # MAGIC receives proportionally higher gradient weight.
@@ -163,7 +167,7 @@ X_train, y_train = df_train[FEATURE_COLS], df_train[TARGET_COL]
 X_val, y_val = df_val[FEATURE_COLS], df_val[TARGET_COL]
 X_test, y_test = df_test[FEATURE_COLS], df_test[TARGET_COL]
 
-# Readmission-only view of TEST: drop deaths so AUC measures bounce-back vs safe.
+# Readmission-only view of TEST: drop post-ICU deaths so AUC measures bounce-back vs safe.
 readmit_mask = (df_test["label_reason"] != "death").to_numpy()
 print(f"\nTest label_reason breakdown:\n{df_test['label_reason'].value_counts()}")
 
@@ -180,19 +184,38 @@ print(f"Test  : {len(X_test):,} rows  | label=1: {y_test.mean()*100:.1f}%")
 
 # COMMAND ----------
 
+# Shallow, heavily regularised trees: on the left-ICU-alive cohort (~4.7 %
+# not safe) these beat the v6 settings (num_leaves=63, min_child_samples=20)
+# by ~0.015 AUC in offline experiments; early stopping picks the tree count.
 lgbm_params = {
-    "n_estimators": 500,
-    "num_leaves": 63,
-    "max_depth": 6,
-    "learning_rate": 0.05,
-    "min_child_samples": 20,
+    "n_estimators": 2000,
+    "num_leaves": 15,
+    "max_depth": -1,
+    "learning_rate": 0.03,
+    "min_child_samples": 100,
     "reg_alpha": 0.1,
     "reg_lambda": 1.0,
-    "class_weight": "balanced",   # handles 97/3 imbalance
+    "class_weight": "balanced",   # ~4.7 % not safe on the left-ICU-alive cohort
     "random_state": 42,
     "n_jobs": -1,
     "verbose": -1,
 }
+
+BOOTSTRAP_ROUNDS = 1000
+
+
+def bootstrap_auc_ci(y_true, y_score, rounds: int = BOOTSTRAP_ROUNDS) -> tuple[float, float]:
+    """95 % percentile bootstrap interval for ROC AUC on the TEST set."""
+    y_true, y_score = np.asarray(y_true), np.asarray(y_score)
+    rng = np.random.default_rng(0)
+    aucs = []
+    for _ in range(rounds):
+        i = rng.integers(0, len(y_true), len(y_true))
+        if y_true[i].min() != y_true[i].max():  # resample must contain both classes
+            aucs.append(roc_auc_score(y_true[i], y_score[i]))
+    lo, hi = np.percentile(aucs, [2.5, 97.5])
+    return float(lo), float(hi)
+
 
 def fit_lgbm(cols: list[str]) -> LGBMClassifier:
     """Fit on TRAIN with early stopping on VAL for the given feature columns."""
@@ -207,7 +230,7 @@ def fit_lgbm(cols: list[str]) -> LGBMClassifier:
     return model
 
 
-with mlflow.start_run(run_name="lgbm_readiness_v3") as run:
+with mlflow.start_run(run_name="lgbm_readiness_v7") as run:
     mlflow.log_params(lgbm_params)
     mlflow.log_param("feature_count", len(FEATURE_COLS))
     mlflow.log_param("train_size", len(X_train))
@@ -217,14 +240,15 @@ with mlflow.start_run(run_name="lgbm_readiness_v3") as run:
     mlflow.log_param("nan_strategy", "passthrough_lgbm_native")
     mlflow.log_param("class_imbalance_strategy", "class_weight_balanced")
 
-    mlflow.log_param("label_definition", "v3: not safe = readmission OR death within 72h")
+    mlflow.log_param("label_definition", "v4: not safe = readmission OR death within 72h of leaving the ICU")
+    mlflow.log_param("cohort", "left ICU alive (died_in_icu and still_in_icu excluded)")
 
-    # ── Baseline: v2 feature set on the v3 label (isolates the label fix) ────
+    # ── Baseline: v2 feature set on the same label and cohort ────────────────
     baseline = fit_lgbm(FEATURE_COLS_V2)
     baseline_prob = baseline.predict_proba(X_test[FEATURE_COLS_V2])[:, 1]
     auc_baseline_v2_features = roc_auc_score(y_test, baseline_prob)
 
-    # ── Train v3 (early stopping on VAL) ─────────────────────────────────────
+    # ── Train v7 (early stopping on VAL) ─────────────────────────────────────
     clf = fit_lgbm(FEATURE_COLS)
     print(f"Best iteration: {clf.best_iteration_}")
     mlflow.log_param("best_iteration", clf.best_iteration_)
@@ -235,6 +259,8 @@ with mlflow.start_run(run_name="lgbm_readiness_v3") as run:
 
     auc = roc_auc_score(y_test, y_prob)
     auc_readmission_only = roc_auc_score(y_test[readmit_mask], y_prob[readmit_mask])
+    auc_ci = bootstrap_auc_ci(y_test, y_prob)
+    auc_readmission_only_ci = bootstrap_auc_ci(y_test[readmit_mask], y_prob[readmit_mask])
     pr_auc_label1 = average_precision_score(y_test, y_prob)
     pr_auc_label0 = average_precision_score(y_test, 1 - y_prob, pos_label=0)  # bounce-back minority
     prec1, rec1, f1_1, _ = precision_recall_fscore_support(
@@ -247,7 +273,11 @@ with mlflow.start_run(run_name="lgbm_readiness_v3") as run:
 
     mlflow.log_metrics({
         "test_auc": auc,
+        "test_auc_ci_low": auc_ci[0],
+        "test_auc_ci_high": auc_ci[1],
         "test_auc_readmission_only": auc_readmission_only,
+        "test_auc_readmission_only_ci_low": auc_readmission_only_ci[0],
+        "test_auc_readmission_only_ci_high": auc_readmission_only_ci[1],
         "test_auc_baseline_v2_features": auc_baseline_v2_features,
         "test_pr_auc_label1": pr_auc_label1,
         "test_pr_auc_label0": pr_auc_label0,
@@ -260,9 +290,10 @@ with mlflow.start_run(run_name="lgbm_readiness_v3") as run:
     })
 
     print(f"\n=== Metrics (clean held-out test set) ===")
-    print(f"AUC:                  {auc:.4f}")
-    print(f"AUC readmission-only: {auc_readmission_only:.4f}  (deaths excluded from TEST)")
-    print(f"AUC baseline (v2 features, v3 label): {auc_baseline_v2_features:.4f}")
+    print(f"AUC:                  {auc:.4f}  95% CI [{auc_ci[0]:.4f}, {auc_ci[1]:.4f}]")
+    print(f"AUC readmission-only: {auc_readmission_only:.4f}  95% CI "
+          f"[{auc_readmission_only_ci[0]:.4f}, {auc_readmission_only_ci[1]:.4f}]  (post-ICU deaths excluded)")
+    print(f"AUC baseline (v2 features): {auc_baseline_v2_features:.4f}")
     print(f"PR-AUC (label=1):     {pr_auc_label1:.4f}  (majority safe class — see note)")
     print(f"PR-AUC (label=0):     {pr_auc_label0:.4f}  (bounce-back detection — clinically meaningful)")
     print(f"Precision(L=1): {prec1:.4f}   Recall(L=1): {rec1:.4f}   F1(L=1): {f1_1:.4f}")
@@ -375,7 +406,9 @@ output = {
     "model_version": str(registered_version),
     "model_uri": model_uri,
     "test_auc": round(auc, 4),
+    "test_auc_ci": [round(x, 4) for x in auc_ci],
     "test_auc_readmission_only": round(auc_readmission_only, 4),
+    "test_auc_readmission_only_ci": [round(x, 4) for x in auc_readmission_only_ci],
     "test_auc_baseline_v2_features": round(auc_baseline_v2_features, 4),
     "test_label_reason_counts": df_test["label_reason"].value_counts().to_dict(),
     "test_pr_auc_label1": round(pr_auc_label1, 4),

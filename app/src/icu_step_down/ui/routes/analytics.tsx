@@ -238,25 +238,25 @@ function AnalyticsContent() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <div className="border rounded-lg p-3 text-center">
               <p className="text-xs text-muted-foreground">AUC-ROC</p>
-              <p className="text-2xl font-bold">0.89</p>
+              <p className="text-2xl font-bold">0.74</p>
               <p className="text-xs text-muted-foreground">
-                Safe step-down vs readmission or death
+                95% CI 0.71–0.76 &middot; safe vs readmission or death in 72h
               </p>
             </div>
             <div className="border rounded-lg p-3 text-center">
               <p className="text-xs text-muted-foreground">
                 Readmission-only AUC
               </p>
-              <p className="text-2xl font-bold text-amber-600">0.63</p>
+              <p className="text-2xl font-bold text-amber-600">0.64</p>
               <p className="text-xs text-amber-600">
                 Bounce-backs alone remain hard
               </p>
             </div>
             <div className="border rounded-lg p-3 text-center">
               <p className="text-xs text-muted-foreground">Not-safe PR-AUC</p>
-              <p className="text-2xl font-bold">0.78</p>
+              <p className="text-2xl font-bold">0.23</p>
               <p className="text-xs text-muted-foreground">
-                vs 12% base rate
+                vs 4.7% base rate (~5&times; lift)
               </p>
             </div>
             <div className="border rounded-lg p-3 text-center">
@@ -270,16 +270,17 @@ function AnalyticsContent() {
 
           <div className="text-xs text-muted-foreground space-y-1 border-t pt-3">
             <p>
-              <strong>What changed in v3:</strong> the outcome now counts death
-              within 72h of leaving the ICU as an unsafe step-down (v2 counted
-              those patients as safe), and 23 lab, urine-output and
-              active-support features were added. Most of the AUC gain comes
-              from that clinically correct label.
+              <strong>What changed in v7:</strong> the model is trained and
+              tested only on patients who left the ICU alive &mdash; the
+              patients a step-down decision is actually made for. v6 also
+              included patients who died in the ICU; their final day is easy
+              to recognise and inflated its AUC to 0.89.
             </p>
             <p>
-              On the readmission-only subset (deaths excluded) the AUC is 0.63:
-              the model is strong at flagging patients at risk of dying, but
-              predicting 72h bounce-back alone remains difficult.
+              On the readmission-only subset (post-ICU deaths excluded) the AUC
+              is 0.64: predicting 72h bounce-back from structured data is
+              genuinely hard. The pilot validates the index on your patients
+              before clinicians rely on it.
             </p>
             <p className="font-medium text-foreground/70">
               This tool is decision support. All transfers must be clinically
@@ -386,8 +387,8 @@ function AnalyticsContent() {
       <DriftMonitorTile drift={data.drift_status} />
 
       <p className="text-xs text-muted-foreground text-center pb-4">
-        MIMIC-III de-identified research data &middot; Model v6 &middot;
-        AUC-ROC 0.89 (readmission-only 0.63) &middot; For decision support only
+        MIMIC-III de-identified research data &middot; Model v7 &middot;
+        AUC-ROC 0.74 (readmission-only 0.64) &middot; For decision support only
       </p>
     </div>
   );

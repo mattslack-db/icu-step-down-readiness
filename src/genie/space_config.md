@@ -9,7 +9,7 @@
 | **Warehouse** | Serverless Starter Warehouse (`c2fa8cdc295a849f`) |
 | **Workspace URL** | `https://fe-sandbox-icu-step-down-readiness.cloud.databricks.com/genie/rooms/01f1c3c57e2d129db3d00e5882886406` |
 | **Parent path** | `/Workspace/Users/matt.slack@databricks.com/genie_spaces` |
-| **Created** | 2026-09-08 (Phase 6); recreated 2026-10-09 on the new sandbox; updated 2026-10-12 to answer current readiness from `gold.census_scores` (pipeline-scored, v6) |
+| **Created** | 2026-09-08 (Phase 6); recreated 2026-10-09 on the new sandbox; updated 2026-10-12 to answer current readiness from `gold.census_scores` (pipeline-scored); 2026-10-16 training-set descriptions updated for the v7 cohort (left the ICU alive) |
 
 **Space description:** Natural language exploration of ICU patient step-down readiness data. Covers current census (40 patients), 61K historical stays with readiness outcomes, and time-series vitals. Answers questions about who is ready for step-down, bounce-back rates, length of stay, vasopressor/ventilator use, and vital signs by patient cohort.
 

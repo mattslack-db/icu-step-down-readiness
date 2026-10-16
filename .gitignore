@@ -27,3 +27,4 @@ build/
 .DS_Store
 .idea/
 .vscode/
+scripts/ml_experiments/data/

@@ -70,6 +70,12 @@ class TestComputeReadinessIndex:
         max_idx = compute_readiness_index(max_score, scores)
         assert max_idx > 50  # should be near the top
 
+    def test_matches_pipeline_on_exact_half_points(self) -> None:
+        """23 of 40 below → exactly 57.5, which BROUND in gold.census_scores rounds
+        to 58. (23/40)*100 is 57.4999… in floating point and would round to 57."""
+        scores = [float(i) for i in range(40)]
+        assert compute_readiness_index(23.0, scores) == 58
+
 
 # ---------------------------------------------------------------------------
 # readiness_band_from_index
