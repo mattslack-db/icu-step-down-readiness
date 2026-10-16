@@ -52,7 +52,7 @@ technical stakeholder said "running in production" was their concern.
 > "Thanks for the time. I've got about twenty minutes of content and I want to
 > leave real time for your questions. The goal today: show you a working way to
 > free ICU capacity without compromising safety, and agree whether it's worth a
-> 60–90 day pilot in one of your units."
+> pilot in one of your units."
 
 **Confirm priorities — one question each (this is "reading the room" early).**
 > To the business stakeholder: "Before I start — is the pressure today mostly
@@ -160,19 +160,23 @@ The narrative model only paraphrases those factors; it doesn't score anything."
 **Tell.** "Now the view for leadership — is this working, and can we trust it?"
 
 **Show.**
-- Band distribution, LOS by band, feature importance (GCS, urine output and age
+- Band distribution, LOS by band, feature importance (age, BUN and urine output
   lead — clinically intuitive drivers).
-- **Model honesty card**: **AUC 0.89** headline, shown *next to* the
-  **readmission-only AUC 0.63** and the **not-safe PR-AUC 0.78** (vs a 12% base
-  rate). Say it before they ask: "the model is strong at flagging patients at risk
-  of dying if we step them down; predicting readmission alone is still hard, and
-  we show that on the screen."
-- **Drift tile** (PSI / KS against the training baseline, checked daily).
+- **Model honesty card**: **AUC 0.74** (95% CI 0.71–0.76), shown *next to* the
+  **readmission-only AUC 0.64** and the **not-safe PR-AUC 0.23** (vs a 4.7% base
+  rate, about 5× lift). Say it before they ask: "this is measured only on
+  patients who left the ICU alive, because those are the only ones a step-down
+  decision is made for. It's good at putting the riskiest patients at the bottom
+  of the list; predicting readmission alone is still hard, and we show that on
+  the screen."
+- **Drift tile** (PSI / KS of live scores against a baseline over every
+  historical stay, checked daily).
 
-> Note for the day: in a fresh environment the latest drift run may show verdict
-> **"insufficient"** (no live scores in the last 24 h) with a large PSI number.
-> Say: "the monitor correctly refuses to call drift on too little live data" —
-> don't read the PSI value out loud.
+> Note for the day: the tile shows **"Insufficient data"** with PSI hidden. The
+> demo census is 40 patients, and the monitor needs 200+ distinct stays over 30
+> days before it calls drift. Say: "On 40 patients a drift number is noise, so
+> the monitor refuses to give a verdict. In a pilot, a 40-bed unit gets there in
+> about two weeks."
 
 **Tell (business landing).**
 > "You get a weekly answer to two questions your board will ask: are we moving
@@ -226,12 +230,12 @@ continuously, and the pipeline scores the census through the serving endpoint
 with `ai_query`. In a pilot the feed is your ADT/charting extract instead of a
 replay."
 
-### Segment E — Platform underneath (≈1.5 min) — *slide 5, then slide 7*
+### Segment E — Platform underneath (≈1.5 min) — *slides 5–6, then slide 8*
 
 **Tell.** "Ninety seconds on what's underneath, because it's what makes this
 repeatable at your scale."
 
-**Show (slide 5 flow).** Source → **Lakeflow** medallion, **continuously
+**Show (slide 5 flow, slide 6 architecture).** Source → **Lakeflow** medallion, **continuously
 streaming** (bronze → silver → gold) → **Unity Catalog** (lineage, DOB removed,
 identifier masks, row-level access) → **Mosaic AI model serving** + foundation
 model → **Lakebase** (Postgres, pseudonymised copies) for fast app reads →
@@ -241,14 +245,14 @@ model → **Lakebase** (Postgres, pseudonymised copies) for fast app reads →
 > For the exec: "One platform, one copy of the data, one set of permissions —
 > fewer vendors and fewer places for patient data to leak."
 > For the architect: "Everything you saw deploys from code with Asset Bundles,
-> and there's a test suite behind it — 198 backend, 37 frontend, 68 pipeline and
-> ML unit tests, and 26 live integration tests that check things like 'no date of
+> and there's a test suite behind it — 199 backend, 40 frontend, 74 pipeline and
+> ML unit tests, and 28 live integration tests that check things like 'no date of
 > birth anywhere in silver or gold'. I re-stood this whole environment up from the
 > repo this week."
 
 ---
 
-## 4. Land the value and the ask (≈3 min) — *slide 4 + slide 9*
+## 4. Land the value and the ask (≈3 min) — *slide 4, slide 10 (plan) + slide 11 (ask)*
 
 **Value math — do it with their numbers, not ours.** Ask for ICU beds, occupancy
 and average LOS; if they won't give them, use this illustration and say so:
@@ -268,10 +272,40 @@ and average LOS; if they won't give them, use this illustration and say so:
 > of 3–4 days that is 20–25% — above the 10–15% headline. Don't quote 0.8 days;
 > use the table above, or fix the slide.
 
-**The ask (slide 9).**
-> To the business stakeholder: "Sponsor a 60–90 day pilot in one ICU. We score it
-> on two numbers you already report: ICU length of stay, with the safe-transfer
-> rate held or improved — 72-hour bounce-back not going up."
+**The plan (slide 10) — tell · show · tell, ~1 min.**
+> Tell: "Here's how we'd earn your clinicians' trust before anyone relies on this."
+>
+> Show the four phases, left to right:
+> 1. **Weeks 1–4 — train on your history.** "We retrain on two to three years of
+>    your own ICU stays, so the index reflects your patients and your practice.
+>    Your ICU medical director co-defines what counts as a safe step-down. Exit
+>    gate: performance on your held-out stays, checked by unit and by patient group."
+> 2. **Weeks 5–8 — silent pilot.** "It scores live patients every shift, but
+>    nobody sees it. We compare it with the calls your clinicians actually made and
+>    what happened in the next 72 hours. That validates the numbers on today's
+>    patients, not just history."
+> 3. **Weeks 9–16 — clinician pilot in one ICU.** "Now it's on rounds. The
+>    decision stays with the clinician, who records agree or disagree and why, and
+>    we review flagged versus actual bounce-backs every week."
+> 4. **Week 17+ — decide and scale.** "Go or no-go with your clinical governance
+>    committee, then unit by unit, with drift monitoring and scheduled retraining."
+>
+> Tell: "So clinicians see nothing until the model has been validated twice, once
+> on your history and once silently on live patients."
+>
+> *Reading the room:* the business stakeholder hears "four months". Pre-empt it:
+> "LOS measurement starts in week 9, and the first eight weeks are mostly your
+> data team's time, not your clinicians'."
+>
+> *If the technical stakeholder pushes on the pace:* "Four weeks to retrain
+> assumes the EHR extract is landed in week 1 — the pipeline is already built,
+> so it's a source change. Eight weeks of clinician pilot in one ICU gives a
+> first read on LOS; we keep tracking 72h bounce-back after the go / no-go."
+
+**The ask (slide 11).**
+> To the business stakeholder: "Sponsor the plan, with an 8-week clinician pilot
+> in one ICU. We score it on two numbers you already report: ICU length of stay,
+> with the safe-transfer rate held or improved — 72-hour bounce-back not going up."
 >
 > To the technical stakeholder: "Point the same pipeline at an extract from your
 > EHR. The architecture doesn't change; the bronze layer's source does."
@@ -302,9 +336,11 @@ bridge to the other persona if useful → check ("does that address it?")**.
 
 **"How long before we see value?"**
 > "The platform piece is already built — you watched me re-deploy it from code.
-> The time goes into two things: getting a governed EHR extract landed, and your
-> clinicians validating the index. Plan weeks for the first, and the 60–90 day
-> pilot for the second. We measure LOS from the first full month."
+> The time goes into two things: getting a governed EHR extract landed and the
+> model retrained on your history, then your clinicians validating it — silently
+> first, then on rounds. That's the plan on slide 10: about four weeks to a
+> validated model on your data, a four-week silent pilot, then an eight-week
+> clinician pilot where we measure LOS — a go / no-go in about four months."
 
 **"What's the clinical risk? What if it's wrong?"**
 > "It's designed as decision support, not a discharge gate: a relative rank, the
@@ -313,21 +349,27 @@ bridge to the other persona if useful → check ("does that address it?")**.
 > criteria include the safe-transfer rate — if bounce-backs go up, the pilot has
 > failed, full stop."
 
-**"How good is the model?" / "0.89 sounds too good."**
-> "0.89 is the headline — the model separates patients who step down safely
-> from those who are readmitted or die within 72 hours. Two honest caveats, and
-> they're on the screen: most of that comes from defining the outcome correctly —
-> our first version counted patients who died as successful step-downs, and fixing
-> that took us from 0.66 to about 0.86 on its own. And on readmission alone it's
-> 0.63 — bounce-backs are genuinely hard to predict. So it's strongest at the
-> thing you'd least want to get wrong: flagging who is too sick to move. That's
-> also why we show a rank, not a probability, and why the pilot validates it
-> prospectively with your clinicians."
-> *Technical bridge:* "Held-out test, touched once. Not-safe PR-AUC 0.78 against
-> a 12% base rate; precision 0.63, recall 0.73. The 0.86 is the old 30 features on
-> the corrected label — that isolates the label fix from the 23 new features. We
-> also closed a lactate leak (it used post-ICU results) and took the 40 census
-> patients out of training, so their scores are out-of-sample."
+**"How good is the model?" / "Is 0.74 good enough?"**
+> "0.74 on patients who left the ICU alive. That's the honest number for this
+> decision. It puts the riskiest patients at the bottom of the list: in the
+> riskiest tail it finds not-safe step-downs at about five times the base rate.
+> On readmission alone it's 0.64, and bounce-backs are genuinely hard to predict
+> from structured data. That's why we show a rank, not a probability; why the
+> clinician makes the call; and why the plan validates it on your patients,
+> silently first, before anyone relies on it."
+>
+> *If they've seen an earlier number:* "An earlier version showed 0.89. We found
+> that 84% of its 'unsafe' outcomes were patients who died in the ICU. Their last
+> day is easy to recognise, and they were never step-down candidates. We took
+> them out, and the number dropped to 0.74. I'd rather show you the number that
+> holds up."
+> *Technical bridge:* "Held-out test, touched once, with 95% bootstrap intervals:
+> AUC 0.714–0.757, readmission-only 0.614–0.673. Cohort is stays that left the
+> ICU alive — 56,860, 4.7% not safe. A patient-grouped split gives the same
+> result, so it isn't leaking through repeat patients. We tried 22 extra trend and
+> discharge-timing features and a bounce-back-only model: neither moved it beyond
+> noise. The next real lift is new information — notes, prior diagnoses,
+> medications — which is exactly what your EHR adds."
 
 **"Why does a ventilated patient have a high index?"** *(if they spot one)*
 > "Because the index is a rank on everything else — oxygenation, GCS, labs. But
@@ -365,7 +407,7 @@ bridge to the other persona if useful → check ("does that address it?")**.
 > views it keeps current, and the pipeline scores the census through the serving
 > endpoint with `ai_query` → Unity Catalog governs every layer (DOB dropped,
 > identifier masks, row-level access) → LightGBM trained in MLflow by a bundle
-> job, registered in UC (`readiness_model` v6), served on Mosaic AI with a
+> job, registered in UC (`readiness_model` v7), served on Mosaic AI with a
 > SHAP-explaining pyfunc → pseudonymised gold copies synced to Lakebase Postgres
 > for millisecond app reads → FastAPI + React Databricks App → Genie on the
 > governed views → a daily job computes PSI/KS drift. All deployed with Asset
@@ -427,7 +469,7 @@ bridge to the other persona if useful → check ("does that address it?")**.
 
 **"What about model governance and rollback?"**
 > "Models are versioned in Unity Catalog with lineage back to the training table;
-> serving pins a version (v6 today), so rollback is a config change. Training is
+> serving pins a version (v7 today), so rollback is a config change. Training is
 > a bundle job: three-way split, test touched once, rows sorted first so the
 > split is reproducible, and an explicit input schema so one missing lab can't
 > fail a whole census call. Every change to the feature list is checked by a test
@@ -466,7 +508,7 @@ then invite:
 - **Do** say "relative readiness index" / "rank". **Don't** say "probability of
   safe discharge" or "the model predicts they're safe".
 - **Do** say "decision support"; **don't** imply automation of discharge orders.
-- **Do** volunteer the AUC caveats (readmission-only 0.63; the label fix) and the
+- **Do** volunteer the AUC caveats (readmission-only 0.64; in-ICU deaths excluded) and the
   MIMIC/replayed census before you're asked.
 - **Don't** quote clinical outcome results — none exist yet; the pilot creates them.
 - **Don't** invent pricing; offer to size it.
@@ -476,17 +518,19 @@ then invite:
 
 | Fact | Value | Source |
 |---|---|---|
-| ICU stays | 61,532 (training: 61,492 — the 40 census stays excluded) | `evidence/05-ml-metrics.md` |
-| Label balance (v6) | 54,195 safe / 7,297 not safe (11.9%): 5,521 deaths, 1,766 bounce-backs | `evidence/05-ml-metrics.md` |
-| v2 label defect | 5,274 deaths had been labelled "safe" | `evidence/05-ml-metrics.md` |
-| Test AUC (v6) | **0.891** (v2 0.659; v2 features + fixed label 0.863) | `evidence/05-ml-metrics.md` |
-| Readmission-only AUC | 0.635 | `evidence/05-ml-metrics.md` |
-| Not-safe PR-AUC / precision / recall | 0.776 / 0.63 / 0.73 (base rate 11.9%) | `evidence/05-ml-metrics.md` |
-| Features | 53 (v2: 30) — top: GCS, urine output, age | `evidence/05-ml-metrics.md` |
+| ICU stays | 61,532; training cohort 56,860 — stays that left the ICU alive (in-ICU deaths, open stays and the 40 census stays excluded) | `evidence/05-ml-metrics.md` |
+| Label balance (v7) | 54,195 safe / 2,665 not safe (4.7%): 1,766 bounce-backs, 899 deaths within 72h of leaving the ICU | `evidence/05-ml-metrics.md` |
+| Why v6's 0.89 was retired | 4,622 of its 5,521 "death" labels (84%) died **in** the ICU — same model scores 0.72 without them | `evidence/ml-cohort-experiment.md` |
+| Test AUC (v7) | **0.735** (95% CI 0.714–0.757); v2 feature set on the same cohort 0.693 | `evidence/05-ml-metrics.md` |
+| Readmission-only AUC | 0.643 (95% CI 0.614–0.673) | `evidence/05-ml-metrics.md` |
+| Not-safe PR-AUC | 0.230 vs 4.7% base rate (~4.9× lift) | `evidence/05-ml-metrics.md` |
+| Features | 53 (v2: 30) — top: age, BUN, urine output, GCS | `evidence/05-ml-metrics.md` |
+| App = pipeline = Genie | all 40 census patients: same score, index and band | `evidence/app-pipeline-score-parity.txt` |
+| Project plan | wk 1–4 train on your history · wk 5–8 silent pilot · wk 9–16 clinician pilot (one ICU) · wk 17+ scale | deck slide 10 |
 | PII | DOB dropped; age capped 90; 0 expectation failures; 0 raw IDs in Postgres | `evidence/pii-obfuscation.txt` |
 | Streaming latency | bronze ~5 s · gold + scores ~2 min · Lakebase ~40 s | `evidence/streaming-run.txt` |
 | Demo census | 40 stays; MICU 15 · SICU 10 · CCU 15 (synthetic units) | `evidence/care-unit-distribution.txt` |
-| Tests | 198 backend · 37 frontend · 68 unit · 26 live integration | `evidence/test-run.log` |
+| Tests | 199 backend · 40 frontend · 74 unit · 28 live integration | `evidence/test-run.log` |
 | Narrative model | `databricks-meta-llama-3-3-70b-instruct` | `src/genai/narrative.py` |
 | Target outcome | 10–15% ICU LOS reduction; $2–5k per avoided ICU day | deck slide 4 |
 

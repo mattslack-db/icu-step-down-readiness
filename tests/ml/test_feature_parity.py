@@ -67,15 +67,33 @@ def test_drift_baseline_scores_with_the_model_feature_list():
     assert _module_lists(DRIFT_BASELINE_PY)["_FEATURE_COLS"] == _module_lists(MODEL_PY)["FEATURE_COLS"]
 
 
+# ai_query serialises a NULL struct field as 0, which the model reads as a real
+# value (GCS 0 = deepest coma). NaN survives the request and LightGBM treats it
+# as missing — exactly what the app sends — so every feature must be NaN-filled.
+_AI_QUERY_FEATURE = r"'(\w+)', COALESCE\(CAST\(\1 AS DOUBLE\), CAST\('NaN' AS DOUBLE\)\)"
+
+
+def _ai_query_block() -> str:
+    sql = GOLD_SQL.read_text()
+    block = sql[sql.index("CREATE OR REFRESH MATERIALIZED VIEW icu_step_down.gold.census_scores"):]
+    return block[block.index("named_struct("):block.index("returnType")]
+
+
 def test_pipeline_ai_query_scores_with_the_model_feature_list():
     """gold.census_scores builds the ai_query request from an explicit column list."""
     import re
 
-    sql = GOLD_SQL.read_text()
-    block = sql[sql.index("CREATE OR REFRESH MATERIALIZED VIEW icu_step_down.gold.census_scores"):]
-    block = block[block.index("named_struct("):block.index("returnType")]
-    cols = re.findall(r"'(\w+)', CAST\(\1 AS DOUBLE\)", block)
+    cols = re.findall(_AI_QUERY_FEATURE, _ai_query_block())
     assert cols == _module_lists(MODEL_PY)["FEATURE_COLS"]
+
+
+def test_pipeline_ai_query_sends_missing_features_as_nan_not_null():
+    """A bare CAST(x AS DOUBLE) would send NULL → 0 and silently mis-score the patient."""
+    import re
+
+    block = _ai_query_block()
+    bare = re.findall(r"'(\w+)', CAST\(\1 AS DOUBLE\)", block)
+    assert bare == [], f"features sent without NaN fill (NULL becomes 0): {bare}"
 
 
 def test_model_includes_v3_features_without_duplicates():

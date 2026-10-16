@@ -202,23 +202,45 @@ class TestGoldReadinessTrainingSet:
         assert bad == 0, f"{bad} rows with readiness_label outside {{0, 1}}"
         assert zeros > 0 and ones > 0
 
-    def test_row_count_is_patient_features_minus_live_cohort(self, sandbox_conn) -> None:
-        """Training set = every patient_features stay EXCEPT the live cohort, whose
-        patients are scored as the current census and must never be trained on."""
-        row = _one(sandbox_conn, """
-            SELECT
-              (SELECT COUNT(*) FROM icu_step_down.gold.patient_features) AS pf_count,
-              (SELECT COUNT(*) FROM icu_step_down.landing.live_cohort) AS cohort_count,
-              (SELECT COUNT(*) FROM icu_step_down.gold.readiness_training_set) AS rts_count,
-              (SELECT COUNT(*) FROM icu_step_down.gold.readiness_training_set t
-                 JOIN icu_step_down.landing.live_cohort c ON c.icustay_id = t.icustay_id) AS overlap
+    def test_no_live_cohort_stays_in_training_set(self, sandbox_conn) -> None:
+        """Live-cohort patients are scored as the current census and must never be trained on."""
+        (overlap,) = _one(sandbox_conn, """
+            SELECT COUNT(*) FROM icu_step_down.gold.readiness_training_set t
+            JOIN icu_step_down.landing.live_cohort c ON c.icustay_id = t.icustay_id
             """)
-        pf_count, cohort_count, rts_count, overlap = row
         assert overlap == 0, f"{overlap} live-cohort stays leaked into the training set"
-        assert rts_count == pf_count - cohort_count
+
+    def test_cohort_is_stays_that_left_the_icu_alive(self, sandbox_conn) -> None:
+        """v4 cohort: only stays where a step-down decision was made. In-ICU deaths
+        (whose last-24h window is the last day of life) and open stays are excluded."""
+        excluded, died_in_icu = _one(sandbox_conn, """
+            SELECT
+              SUM(CASE WHEN t.label_reason IN ('died_in_icu', 'still_in_icu') THEN 1 ELSE 0 END),
+              SUM(CASE WHEN s.outtime IS NULL OR s.deathtime <= s.outtime + INTERVAL 1 HOUR
+                       THEN 1 ELSE 0 END)
+            FROM icu_step_down.gold.readiness_training_set t
+            JOIN icu_step_down.silver.icu_stays s ON s.icustay_id = t.icustay_id
+            """)
+        assert excluded == 0, f"{excluded} rows with an excluded label_reason"
+        assert died_in_icu == 0, f"{died_in_icu} in-ICU deaths / open stays in the training set"
+
+    def test_row_count_is_every_eligible_stay(self, sandbox_conn) -> None:
+        """Nothing is dropped silently: training set = patient_features − live cohort
+        − in-ICU deaths − open stays (e.g. a lossy join would shrink it)."""
+        expected, actual = _one(sandbox_conn, """
+            SELECT
+              (SELECT COUNT(*)
+                 FROM icu_step_down.gold.patient_features pf
+                 JOIN icu_step_down.silver.icu_stays s ON s.icustay_id = pf.icustay_id
+                 LEFT ANTI JOIN icu_step_down.landing.live_cohort c ON c.icustay_id = pf.icustay_id
+                WHERE s.outtime IS NOT NULL
+                  AND NOT COALESCE(s.deathtime <= s.outtime + INTERVAL 1 HOUR, FALSE)),
+              (SELECT COUNT(*) FROM icu_step_down.gold.readiness_training_set)
+            """)
+        assert actual == expected, f"training set has {actual} rows; {expected} stays are eligible"
 
     def test_deaths_within_72h_are_labelled_not_safe(self, sandbox_conn) -> None:
-        """v3 label: death in the ICU / within 72h of leaving it is never 'safe'."""
+        """Death within 72h of leaving the ICU is never 'safe'."""
         row = _one(sandbox_conn, """
             SELECT
               SUM(CASE WHEN label_reason = 'death' AND readiness_label = 1 THEN 1 ELSE 0 END),

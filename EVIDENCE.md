@@ -45,10 +45,12 @@ Full event log (every flow `COMPLETED`, bronze→silver→gold): [`evidence/pipe
 (serverless SQL warehouse):
 
 ```
--- readiness_training_set label balance (safe = alive + no readmission + no death in 72h; v2 mislabelled 5,274 deaths as safe)
+-- readiness_training_set label balance (v7 cohort: stays that left the ICU alive;
+-- safe = no ICU readmission and no death within 72h of leaving). Captured 2026-10-16.
 readiness_label   n        pct
-0 (not safe)      7,297    11.9%   (1,766 bounce-back + 5,521 death + 10 still_in_icu)
-1 (safe)          54,195   88.1%
+0 (not safe)      2,665    4.7%    (1,766 bounce-back + 899 death within 72h of leaving the ICU)
+1 (safe)          54,195   95.3%
+-- excluded from the training set: 4,622 died_in_icu, 10 still_in_icu, 40 live census stays
 
 -- vasopressor / ventilator prevalence (patient_features, n=61,532)
 on_vasopressors  on_ventilator   n
@@ -69,7 +71,7 @@ Full queries + sample feature rows: [`evidence/gold-queries.txt`](evidence/gold-
 ## 3. Real served prediction — Mosaic AI endpoint `icu-readiness`
 
 `databricks serving-endpoints query icu-readiness` (model
-`icu_step_down.ml.readiness_model` v6), two patients, 53 features each. Verbatim response:
+`icu_step_down.ml.readiness_model` v6 at capture time; the endpoint now serves v7), two patients, 53 features each. Verbatim response:
 
 ```json
 {

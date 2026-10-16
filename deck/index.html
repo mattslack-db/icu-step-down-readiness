@@ -41,6 +41,17 @@
   .dot:hover{background:var(--muted)}
   .dot[aria-current="step"]{background:var(--accent);transform:scale(1.35)}
   .counter{justify-self:end;font-variant-numeric:tabular-nums;font-weight:600}
+  .stat.amber{color:var(--amber)}
+  .timeline{display:flex;gap:4px;margin:6px 0 14px;font-size:12px;font-weight:700;color:#fff}
+  .timeline span{padding:7px 10px;border-radius:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .phase{display:flex;flex-direction:column;border-top:5px solid var(--phase);padding-top:16px}
+  .phase .when{font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--phase)}
+  .phase strong{font-size:17px;margin:4px 0 2px}
+  .phase ul{flex:1;padding-left:1em;margin:.4em 0}
+  .phase li{font-size:14px;line-height:1.4;color:var(--muted);margin:.3em 0}
+  .gate{border-top:1px dashed var(--line);padding-top:10px;font-size:13px;line-height:1.4}
+  .gate b{color:var(--phase)}
+  .p1{--phase:#1b5fb4}.p2{--phase:#6d4bc2}.p3{--phase:var(--green)}.p4{--phase:var(--accent)}
   code{background:#eef2f9;padding:1px 6px;border-radius:6px;font-size:.9em}
   @media(prefers-color-scheme:dark){:root{--ink:#e8eefc;--muted:#9fb0cc;--bg:#0b1220;--card:#131c2e;--line:#243149}}
   @page wide{size:11in 8.5in}
@@ -53,6 +64,12 @@
     .slide:last-child{page-break-after:auto;break-after:auto}
     .slide.wide{page:wide;padding:0.45in 0.6in;height:auto;min-height:0;box-sizing:border-box}
     .slide.wide img{max-height:4.6in!important}
+    .slide.wide h2{font-size:24px}
+    .slide.wide .grid{gap:12px}
+    .slide.wide .phase{padding:12px 14px}
+    .slide.wide .phase li{font-size:11.5px;margin:.2em 0}
+    .slide.wide .gate{font-size:11px}
+    .slide.wide p{font-size:13px}
     .card,.step{box-shadow:none}
     *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
   }
@@ -120,7 +137,7 @@
   <section class="slide wide">
     <div class="kicker">Architecture</div>
     <h2>Governed, continuously streaming, AI-scored — on one platform</h2>
-    <img src="architecture.png" alt="ICU Step-Down Readiness architecture: MIMIC-III Delta Share and a live vitals replay stream into a continuous Lakeflow medallion (bronze streaming tables, silver with DOB dropped, gold with masked IDs and in-pipeline scores); Mosaic AI trains, registers and serves model v6; pseudonymised gold copies sync to Lakebase; Unity Catalog governs masks, row-level access and PII audit; the Databricks App and Genie serve clinicians." style="width:100%;max-height:68vh;object-fit:contain;margin-top:10px;border-radius:12px">
+    <img src="architecture.png" alt="ICU Step-Down Readiness architecture: MIMIC-III Delta Share and a live vitals replay stream into a continuous Lakeflow medallion (bronze streaming tables, silver with DOB dropped, gold with masked IDs and in-pipeline scores); Mosaic AI trains, registers and serves model v7; pseudonymised gold copies sync to Lakebase; Unity Catalog governs masks, row-level access and PII audit; the Databricks App and Genie serve clinicians." style="width:100%;max-height:68vh;object-fit:contain;margin-top:10px;border-radius:12px">
     <p class="muted" style="margin-top:12px">Source data streams in continuously; silver drops date of birth; gold carries masked identifiers and live model scores; the app reads pseudonymised Lakebase copies; Unity Catalog governs every layer. Editable source: <code>deck/architecture.drawio</code>.</p>
   </section>
 
@@ -132,7 +149,7 @@
         <ul>
           <li><strong>Census dashboard</strong> — every current patient ranked by a relative readiness index (re-scored within minutes as new vitals stream in), color-banded Ready / Borderline / Not-ready.</li>
           <li><strong>Patient detail</strong> — the factors driving each recommendation, vital-sign trends, and a plain-language <strong>AI clinical summary</strong>.</li>
-          <li><strong>Analytics</strong> — capacity and outcome trends, with honest model performance (v6: AUC 0.89 headline, 0.63 readmission-only).</li>
+          <li><strong>Analytics</strong> — capacity and outcome trends, with honest model performance (v7: AUC 0.74, 0.64 readmission-only).</li>
         </ul>
         <p class="muted">Live: <code>icu-step-down-7474645901826067.aws.databricksapps.com</code></p>
       </div>
@@ -152,7 +169,7 @@
     <div class="grid g2">
       <div class="card"><strong>Governed by design</strong><p class="muted">Unity Catalog across the medallion — DOB dropped, identifiers pseudonymized via UC column masks, PII classification tags, least-privilege grants, full bronze→gold lineage with continuous audit.</p></div>
       <div class="card"><strong>Live-fed & operationally served</strong><p class="muted">Continuous Lakeflow streaming pipeline — new vitals in bronze in seconds, scores in ~2 min; pseudonymised gold synced to Lakebase (Postgres) for low-latency app reads; model served on Mosaic AI; narrative via Foundation Model API.</p></div>
-      <div class="card"><strong>Reproducible</strong><p class="muted">Everything deploys via Databricks Asset Bundles; 198 backend + 37 frontend + 68 pipeline/ML unit + 26 live integration tests, run output committed.</p></div>
+      <div class="card"><strong>Reproducible</strong><p class="muted">Everything deploys via Databricks Asset Bundles; 199 backend + 40 frontend + 74 pipeline/ML unit + 28 live integration tests, run output committed.</p></div>
       <div class="card"><strong>Safe by framing</strong><p class="muted">Public de-identified MIMIC; a relative decision-support index, not an automated discharge gate.</p></div>
     </div>
   </section>
@@ -161,18 +178,72 @@
     <div class="kicker">Model honesty</div>
     <h2>Decision support, not a discharge switch</h2>
     <div class="grid g3">
-      <div class="card"><div class="stat">AUC 0.89</div><div class="label">Strong headline discrimination (v2 was 0.66; gain from label fix + 23 new features)</div></div>
-      <div class="card"><div class="stat amber">Readmission-only 0.63</div><div class="label">Predicting 72h bounce-back alone is harder; deaths now labelled separately and honestly</div></div>
+      <div class="card"><div class="stat">AUC 0.74</div><div class="label">95% CI 0.71–0.76 on patients who left the ICU alive — the only patients a step-down decision is made for. Flags not-safe step-downs at ~5× the base rate</div></div>
+      <div class="card"><div class="stat amber">Readmission-only 0.64</div><div class="label">72h bounce-back alone is genuinely hard from structured data. We say so, rather than hide it</div></div>
       <div class="card"><div class="stat">Index, not %</div><div class="label">Relative readiness rank within the current census — never a "probability of safe discharge"</div></div>
     </div>
-    <p class="muted" style="margin-top:18px">Explainable: SHAP factors in clinical language; known risks always shown as risks, and a patient on vasopressors or a ventilator in the last 24h is never banded Ready. The roadmap to stronger readmission discrimination: prospective validation with the clinical team and real-time feature enrichment.</p>
+    <p class="muted" style="margin-top:18px">Explainable: SHAP factors in clinical language; known risks always shown as risks, and a patient on vasopressors or a ventilator in the last 24h is never banded Ready. We retired an earlier 0.89: it counted patients who died in the ICU, whose final day is easy to recognise. The next lift comes from your data, notes and validation with your clinicians.</p>
+  </section>
+
+  <section class="slide wide">
+    <div class="kicker">Project plan</div>
+    <h2>Trained on your history, proven on your unit — before anyone relies on it</h2>
+    <div class="timeline" aria-hidden="true">
+      <span class="p1" style="flex:4;background:var(--phase)">Weeks 1–4 · Train on your history</span>
+      <span class="p2" style="flex:4;background:var(--phase)">Weeks 5–8 · Silent pilot</span>
+      <span class="p3" style="flex:8;background:var(--phase)">Weeks 9–16 · Clinician pilot</span>
+      <span class="p4" style="flex:3;background:var(--phase)">Week 17+ · Scale</span>
+    </div>
+    <div class="grid g4">
+      <div class="card phase p1">
+        <span class="when">Phase 1 · Weeks 1–4</span>
+        <strong>Train on your historical data</strong>
+        <ul>
+          <li>Point the same governed pipeline at your EHR feed — 2–3 years of your ICU stays</li>
+          <li>Retrain on your patients, practice and outcomes</li>
+          <li>ICU Medical Director co-defines features, guardrails and the &ldquo;safe step-down&rdquo; label</li>
+        </ul>
+        <div class="gate"><b>Exit gate:</b> discrimination and calibration on your held-out stays, checked by unit and patient subgroup</div>
+      </div>
+      <div class="card phase p2">
+        <span class="when">Phase 2 · Weeks 5–8</span>
+        <strong>Silent pilot</strong>
+        <ul>
+          <li>Live scores every shift, <em>not shown</em> to clinicians</li>
+          <li>Compared with the step-down calls clinicians actually made, and 72h outcomes</li>
+          <li>Validates the numbers on today's patients, not just history</li>
+        </ul>
+        <div class="gate"><b>Exit gate:</b> live performance matches retrospective; no safety signal in Ready-banded patients</div>
+      </div>
+      <div class="card phase p3">
+        <span class="when">Phase 3 · Weeks 9–16</span>
+        <strong>Clinician pilot — one ICU</strong>
+        <ul>
+          <li>Ranked census used on rounds; the decision stays with the clinician</li>
+          <li>Clinicians record agree / disagree and why</li>
+          <li>Weekly review of flagged vs actual bounce-backs builds trust and tunes thresholds</li>
+        </ul>
+        <div class="gate"><b>Exit gate:</b> ICU LOS reduced with safe-transfer and 72h bounce-back rates held or improved</div>
+      </div>
+      <div class="card phase p4">
+        <span class="when">Phase 4 · Week 17+</span>
+        <strong>Decide &amp; scale</strong>
+        <ul>
+          <li>Go / no-go with clinical governance</li>
+          <li>Extend unit by unit on the same platform</li>
+          <li>Drift monitoring and scheduled retraining</li>
+        </ul>
+        <div class="gate"><b>Ongoing:</b> performance reported to the clinical governance board</div>
+      </div>
+    </div>
+    <p class="muted" style="margin-top:16px">Clinicians see nothing until the model has been validated twice: first on your history, then silently on live patients. Trust is earned before the index is used on rounds.</p>
   </section>
 
   <section class="slide">
     <div class="kicker">The ask</div>
     <h2>From prototype to a unit pilot</h2>
     <ul>
-      <li><strong>VP of Clinical Operations / CMO</strong> <span class="muted">— measured on ICU length of stay, bed occupancy, and emergent-admission wait times:</span> sponsor a 60–90 day pilot in one ICU, scored on LOS reduction with the safe-transfer rate held or improved.</li>
+      <li><strong>VP of Clinical Operations / CMO</strong> <span class="muted">— measured on ICU length of stay, bed occupancy, and emergent-admission wait times:</span> sponsor the plan, with an 8-week clinician pilot in one ICU scored on LOS reduction with the safe-transfer rate held or improved.</li>
       <li><strong>ICU Medical Director</strong> <span class="muted">— measured on safe-transfer rate and 48–72h ICU bounce-back:</span> co-define the readiness features and validate the index against your step-down criteria.</li>
       <li><strong>CMIO / VP Data &amp; Analytics</strong> <span class="muted">— measured on time-to-value and governed reuse:</span> point the same pipeline at your EHR feed — the architecture is unchanged.</li>
     </ul>

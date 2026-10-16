@@ -66,6 +66,18 @@ BASELINE_TABLE = f"{_CATALOG}.gold.readiness_training_baseline"
 HISTORY_TABLE = f"{_CATALOG}.gold.readiness_score_history"
 CENSUS_SOURCE = f"{_CATALOG}.gold.census"
 
+# The baseline is the score distribution over EVERY historical stay, not the
+# training cohort: the training set drops in-ICU deaths (stays that never had a
+# step-down decision), but the live census still contains the sickest patients.
+# Scoring the training set would leave those with no baseline counterpart and
+# make PSI flag drift that isn't there. Live-cohort stays are excluded because
+# they are what the drift check compares against.
+BASELINE_SOURCE_SQL = (
+    "SELECT " + ", ".join(f"pf.`{c}`" for c in _FEATURE_COLS)
+    + f" FROM {_CATALOG}.gold.patient_features pf"
+    " LEFT ANTI JOIN icu_step_down.landing.live_cohort lc ON lc.icustay_id = pf.icustay_id"
+)
+
 BASELINE_TABLE_DDL = f"""
 CREATE TABLE IF NOT EXISTS {BASELINE_TABLE} (
     quantile      DOUBLE      NOT NULL,
@@ -182,8 +194,8 @@ def write_training_baseline(
     spark: Any | None = None,
 ) -> None:  # pragma: no cover
     """
-    Score gold.readiness_training_set, compute decile quantiles, and write
-    gold.readiness_training_baseline.  Safe to re-run (overwrites old rows).
+    Score every historical stay (gold.patient_features minus the live cohort),
+    compute decile quantiles, and write gold.readiness_training_baseline.  Safe to re-run (overwrites old rows).
 
     Args:
         model_version: Registered model version string (e.g. "2").
@@ -197,28 +209,24 @@ def write_training_baseline(
     # Create table if needed
     spark.sql(BASELINE_TABLE_DDL)
 
-    # Load the registered model — readiness_score does NOT exist as a column in
-    # gold.readiness_training_set; it is computed at serving time.
+    # Load the registered model — readiness_score is not a stored column; it is
+    # computed at serving time.
     import mlflow  # type: ignore[import-not-found]
 
     model = mlflow.pyfunc.load_model(
         f"models:/{_CATALOG}.ml.readiness_model/{model_version}"
     )
 
-    # Read the 30 feature columns from the training set (no readiness_score column).
-    feature_select = ", ".join(f"`{c}`" for c in _FEATURE_COLS)
-    training_df = spark.sql(
-        f"SELECT {feature_select} FROM {_CATALOG}.gold.readiness_training_set"
-    )
-    training_pandas = training_df.toPandas()
+    # Read the feature columns for every historical stay (see BASELINE_SOURCE_SQL).
+    training_pandas = spark.sql(BASELINE_SOURCE_SQL).toPandas()
 
     if training_pandas.empty:
         raise ValueError(
-            f"{_CATALOG}.gold.readiness_training_set returned no rows. "
-            "Run the training pipeline before computing the baseline."
+            f"{_CATALOG}.gold.patient_features returned no rows. "
+            "Run the pipeline before computing the baseline."
         )
 
-    # Score the training set; parse readiness_score out of the JSON prediction column.
+    # Score the stays; parse readiness_score out of the JSON prediction column.
     # Filter out None/NaN prediction values before parsing so a null row from the
     # model (e.g. a row with all-NaN features) cannot crash json.loads.
     # Coerce all features to float64 BEFORE predict — MLflow signature enforcement
@@ -230,7 +238,7 @@ def write_training_baseline(
 
     if not scores:
         raise ValueError(
-            "Model produced no scores from the training set. "
+            "Model produced no scores from gold.patient_features. "
             "Check that all feature columns are populated."
         )
 

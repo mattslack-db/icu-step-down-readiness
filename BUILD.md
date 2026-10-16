@@ -35,8 +35,8 @@ unit-level access control.
 3. **Subagent-driven execution**: each task implemented by a fresh subagent, then
    checked by a separate reviewer subagent (spec compliance + code quality), with
    a fix loop, then a whole-branch review at the end. Progress tracked in a ledger.
-4. **TDD throughout**: tests written first; 198 backend + 37 frontend + 68
-   pipeline/ML unit + 26 live integration pass (see [`evidence/test-run.log`](evidence/test-run.log)).
+4. **TDD throughout**: tests written first; 199 backend + 40 frontend + 74
+   pipeline/ML unit + 28 live integration pass (see [`evidence/test-run.log`](evidence/test-run.log)).
 5. **Live verification**: pipeline, serving, Genie, Lakebase, app, drift, and
    unit-access all exercised against the sandbox; verbatim output committed
    (see [`EVIDENCE.md`](EVIDENCE.md), [`evidence/`](evidence/), [`evidence/`](evidence/)).
@@ -59,7 +59,7 @@ before implementation, review after). Representative interaction shapes:
 
 | Decision | Why (trade-off) |
 |----------|-----------------|
-| **Relative readiness index (0–100 percentile within the current census)** instead of a "probability of safe discharge" | v6 headline AUC 0.891 after label fix + new features, but readmission-only AUC 0.635 (predicting bounce-back alone is hard); a relative rank is still the safest framing. A calibrated probability would overstate precision given the readmission-only challenge. |
+| **Relative readiness index (0–100 percentile within the current census)** instead of a "probability of safe discharge" | v7 AUC 0.735 on stays that left the ICU alive, readmission-only AUC 0.643 (predicting bounce-back alone is hard); a relative rank is still the safest framing. A calibrated probability would overstate precision given the readmission-only challenge. |
 | **Always-flag-known-risks override**: vasopressors / ventilator are shown as `risk` regardless of the raw SHAP sign | Clinical safety — a decision-support tool must never present active life-support as "supporting discharge." Implemented in factor normalization; visible in the served-prediction evidence. |
 | **Documented guardrail rule set** (`recent_extubation`, `active_bleeding` injected as risks) | Extends the same safety principle into a small, auditable rule set rather than ad-hoc checks. |
 | **Delta Share MIMIC-III with a public fallback**, gated up front | De-risks the data dependency; keeps the build on public, de-identified data (no PHI). |
@@ -69,7 +69,9 @@ before implementation, review after). Representative interaction shapes:
 | **Drift monitoring (PSI/KS live vs training)** | Gives the "roadmap to stronger discrimination" a concrete, monitorable signal. |
 | **Synthetic `care_unit` (MICU/SICU/CCU)** | MIMIC-III is de-identified with no real unit; a deterministic synthetic dimension enables the governance/access demo without inventing patient data. |
 | **Label fix (v2→v6):** safe = alive + no readmission + no death in 72h | v2 labelled 5,274 deaths as "safe" (no readmission after leaving); corrected label separates deaths. Most of the AUC gain v2 (0.659) → v6 (0.891) comes from this fix; 23 new features add the remainder. |
-| **23 new features (53 total):** last-24h labs, vitals variability, charting density, prior ICU stays, admission type, hours to ICU, surgical/cardiac ICU, male | Improved feature set on corrected training data (61,492 rows; 54,195 safe / 7,297 not safe / 5,521 deaths). |
+| **23 new features (53 total):** last-24h labs, vitals variability, charting density, prior ICU stays, admission type, hours to ICU, surgical/cardiac ICU, male | On the v7 cohort they add ~0.04 AUC over the v2 feature set (0.693 → 0.735). |
+| **v7 cohort: stays that left the ICU alive** (`died_in_icu` and `still_in_icu` excluded in the pipeline) | 4,622 of v6's 5,521 "death" labels were deaths in the ICU, whose last-24h window is the last day of life. That inflated v6's AUC to 0.891; on the honest cohort the same model scores ~0.72. v7: 56,860 stays, 4.7% not safe. See [`evidence/ml-cohort-experiment.md`](evidence/ml-cohort-experiment.md). |
+| **`ai_query` features NaN-filled** in `gold.census_scores` | `ai_query` sends a NULL field to the model as 0 (GCS 0 = deepest coma), so pipeline scores differed from the app for most of the census. NaN is LightGBM's missing value; `tests/ml/test_feature_parity.py` guards it. |
 | **PII obfuscation:** DOB dropped, age capped at 90, identifiers pseudonymized with UC column masks | HIPAA Safe Harbor compliance; Lakebase syncs pre-pseudonymized tables to avoid double-masking while keeping Postgres free of raw identifiers. |
 | **Streaming pipeline in CONTINUOUS mode** | Bronze STREAMING TABLES read from Delta Share history; live cohort frozen in `landing.live_cohort`; replay job releases real historical chart events hourly. Measured latency: ~5s to bronze, ~134s to gold, ~37s Lakebase sync. |
 

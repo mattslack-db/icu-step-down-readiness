@@ -42,7 +42,9 @@ def compute_readiness_index(score: float, all_scores: list[float]) -> int:
     if n == 0:
         return 50
     rank = sum(1 for s in all_scores if s < score)
-    return round((rank / n) * 100)
+    # 100 * rank / n, not (rank / n) * 100: the latter gives 57.4999… for 23/40
+    # and rounds differently from the pipeline's exact BROUND(57.5) = 58.
+    return round(100 * rank / n)
 
 
 def readiness_band_from_index(index: int) -> str:

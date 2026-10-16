@@ -15,7 +15,7 @@ sys.path.append("/Workspace/Users/matt.slack@databricks.com/.bundle/icu_step_dow
 import importlib
 # Must equal the served version (resources/model_serving.yml entity_version);
 # drift_check.py fails loudly on a baseline/served mismatch.
-MODEL_VERSION = "6"
+MODEL_VERSION = "7"
 import src.monitoring.baseline as b
 importlib.reload(b)
 

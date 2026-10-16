@@ -208,7 +208,7 @@
       {
         "identifier": "icu_step_down.gold.readiness_training_set",
         "description": [
-          "Historical ICU stays (61,492 rows; current census patients excluded) with last-24h features and an OUTCOME label. readiness_label=1: safe step-down (left ICU alive, no readmission and no death within 72h). readiness_label=0: not safe — label_reason distinguishes 'bounce_back' (readmitted within 72h), 'death' (died in ICU or within 72h) and 'still_in_icu'. ~88% label=1. Use only for historical outcome analysis."
+          "Historical ICU stays that LEFT THE ICU ALIVE (56,860 rows; current census patients, deaths in the ICU and open stays excluded) with last-24h features and an OUTCOME label. readiness_label=1: safe step-down (no ICU readmission and no death within 72h of leaving the ICU). readiness_label=0: not safe — label_reason distinguishes 'bounce_back' (readmitted to the ICU within 72h) and 'death' (died within 72h of leaving the ICU). ~95% label=1. Use only for historical outcome analysis. It cannot answer ICU mortality questions: patients who died in the ICU are not in it."
         ],
         "column_configs": [
           {
@@ -446,7 +446,7 @@
           "What fraction of ICU stays had a bounce-back within 72 hours?"
         ],
         "sql": [
-          "SELECT ROUND(SUM(CASE WHEN r.label_reason = 'bounce_back' THEN 1 ELSE 0 END) * 100.0 / COUNT(*), 2) AS bounce_back_pct, SUM(CASE WHEN r.label_reason = 'bounce_back' THEN 1 ELSE 0 END) AS bounce_back_count, SUM(CASE WHEN r.label_reason = 'death' THEN 1 ELSE 0 END) AS deaths_within_72h, COUNT(*) AS total_stays FROM icu_step_down.gold.readiness_training_set r"
+          "SELECT ROUND(SUM(CASE WHEN r.label_reason = 'bounce_back' THEN 1 ELSE 0 END) * 100.0 / COUNT(*), 2) AS bounce_back_pct, SUM(CASE WHEN r.label_reason = 'bounce_back' THEN 1 ELSE 0 END) AS bounce_back_count, SUM(CASE WHEN r.label_reason = 'death' THEN 1 ELSE 0 END) AS deaths_within_72h_of_icu_discharge, COUNT(*) AS total_stays FROM icu_step_down.gold.readiness_training_set r"
         ]
       }
     ],
@@ -464,7 +464,7 @@
           "- NEVER use readiness_training_set for current patients: current patients are not in it, and its labels are historical OUTCOMES that are not known for patients still in the ICU.\n",
           "- Safety guardrail: patients on vasopressors or a ventilator in the last 24h (life_support_24h = true) are NEVER 'Ready' — their band is capped at 'Borderline' even when readiness_index >= 66. Mention this when explaining why a high-index patient is not Ready.\n",
           "- Use readiness_training_set ONLY for historical stays, outcome rates, or aggregate statistics across the full dataset.\n",
-          "- readiness_label (historical): 1 = safe step-down (left ICU alive, no readmission and no death within 72h); 0 = not safe. label_reason says why: 'safe', 'bounce_back' (ICU readmission within 72h), 'death' (died in ICU or within 72h), 'still_in_icu'.\n",
+          "- readiness_label (historical): 1 = safe step-down (no ICU readmission and no death within 72h of leaving the ICU); 0 = not safe. label_reason says why: 'safe', 'bounce_back' (ICU readmission within 72h), 'death' (died within 72h of leaving the ICU). The table holds only stays that left the ICU alive, so it cannot answer ICU mortality questions.\n",
           "- 'Bounce-back' = label_reason = 'bounce_back' (NOT readiness_label = 0, which also includes deaths).\n",
           "- GCS (gcs_last) is the Glasgow Coma Scale TOTAL score, range 3-15; higher is better; 15 = fully alert.\n",
           "- los is in DAYS stored as string; use CAST(los AS DOUBLE) for arithmetic.\n",

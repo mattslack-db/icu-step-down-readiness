@@ -13,6 +13,8 @@ from __future__ import annotations
 import pytest
 
 from src.monitoring.drift_check import (
+    LIVE_SCORES_SQL,
+    LIVE_WINDOW_DAYS,
     MIN_LIVE_SAMPLE,
     drift_verdict,
     ks_statistic,
@@ -97,6 +99,28 @@ def test_verdict_insufficient_below_min_sample() -> None:
 def test_verdict_insufficient_at_min_minus_one() -> None:
     """Boundary: MIN_LIVE_SAMPLE - 1 is still insufficient."""
     assert drift_verdict(psi=0.0, n_live=MIN_LIVE_SAMPLE - 1) == "insufficient"
+
+
+def test_min_sample_supports_ten_bin_psi() -> None:
+    """10 bins need ~20 stays each: PSI over a 40-patient census is noise (one empty
+    decile alone adds ~2 to PSI), so it must read as insufficient, not drift."""
+    assert MIN_LIVE_SAMPLE >= 200
+    assert drift_verdict(psi=4.95, n_live=40) == "insufficient"
+
+
+def test_live_scores_count_each_stay_once() -> None:
+    """Snapshots repeat the same census; n_live must be distinct stays, not rows."""
+    assert "PARTITION BY icustay_id ORDER BY captured_at DESC" in LIVE_SCORES_SQL
+    assert "rn = 1" in LIVE_SCORES_SQL
+
+
+def test_live_window_can_reach_the_minimum_sample() -> None:
+    """A 40-bed unit (~3.5-day stays → ~11 admissions/day) must reach MIN_LIVE_SAMPLE
+    distinct stays within the window."""
+    beds, mean_los_days = 40, 3.5
+    distinct_stays = beds + LIVE_WINDOW_DAYS * beds / mean_los_days
+    assert f"INTERVAL {LIVE_WINDOW_DAYS} DAYS" in LIVE_SCORES_SQL
+    assert distinct_stays >= MIN_LIVE_SAMPLE
 
 
 # ---------------------------------------------------------------------------

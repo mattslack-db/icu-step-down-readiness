@@ -20,6 +20,7 @@ import pandas as pd
 from src.monitoring.baseline import (
     _CATALOG,
     _FEATURE_COLS,
+    BASELINE_SOURCE_SQL,
     CENSUS_SOURCE,
     _coerce_feature_frame,
     compute_decile_quantiles,
@@ -47,6 +48,19 @@ class TestCensusSource:
         assert len(parts) == 3, (
             f"CENSUS_SOURCE '{CENSUS_SOURCE}' must be a 3-part name; got {len(parts)} parts."
         )
+
+
+class TestBaselineSource:
+    def test_baseline_scores_all_stays_not_the_training_cohort(self) -> None:
+        """The training set excludes in-ICU deaths, but the live census still holds
+        the sickest patients. A baseline built from the training set would make PSI
+        flag drift that isn't there; patient_features covers every stay."""
+        assert f"FROM {_CATALOG}.gold.patient_features" in BASELINE_SOURCE_SQL
+        assert "readiness_training_set" not in BASELINE_SOURCE_SQL
+
+    def test_baseline_excludes_the_live_cohort(self) -> None:
+        """Live census stays are what the drift check compares against."""
+        assert "LEFT ANTI JOIN icu_step_down.landing.live_cohort" in BASELINE_SOURCE_SQL
 
 
 # ---------------------------------------------------------------------------

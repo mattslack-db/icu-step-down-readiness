@@ -118,7 +118,7 @@ const VERDICT_CONFIG: Record<
     label: "Insufficient data",
     colorClass: "border-muted",
     textClass: "text-muted-foreground",
-    desc: "Not enough live scores to assess drift reliably.",
+    desc: "Fewer than 200 distinct stays scored in the last 30 days — PSI is not reliable on a sample this small, so no drift verdict is given.",
   },
 };
 
@@ -147,6 +147,9 @@ function DriftMonitorTile({ drift }: { drift: DriftStatus | null | undefined }) 
 
   const config =
     VERDICT_CONFIG[drift.verdict] ?? VERDICT_CONFIG["insufficient"];
+  // PSI on a small sample is noise (one empty decile adds ~2): don't show a
+  // number next to "Insufficient data" that reads as drift.
+  const hasVerdict = drift.verdict !== "insufficient";
 
   return (
     <Card className={config.colorClass}>
@@ -168,26 +171,32 @@ function DriftMonitorTile({ drift }: { drift: DriftStatus | null | undefined }) 
           </div>
           <div className="border rounded-lg p-3 text-center">
             <p className="text-xs text-muted-foreground">PSI</p>
-            <p className="text-2xl font-bold">{drift.psi.toFixed(3)}</p>
+            <p className="text-2xl font-bold">
+              {hasVerdict ? drift.psi.toFixed(3) : "—"}
+            </p>
             <p className="text-xs text-muted-foreground">
-              {drift.psi < 0.10
-                ? "< 0.10 stable"
-                : drift.psi < 0.25
-                  ? "0.10–0.25 moderate"
-                  : "≥ 0.25 drift"}
+              {!hasVerdict
+                ? "Needs 200+ stays"
+                : drift.psi < 0.10
+                  ? "< 0.10 stable"
+                  : drift.psi < 0.25
+                    ? "0.10–0.25 moderate"
+                    : "≥ 0.25 drift"}
             </p>
           </div>
           <div className="border rounded-lg p-3 text-center">
             <p className="text-xs text-muted-foreground">KS</p>
             <p className="text-2xl font-bold">
-              {drift.ks != null ? drift.ks.toFixed(3) : "—"}
+              {hasVerdict && drift.ks != null ? drift.ks.toFixed(3) : "—"}
             </p>
             <p className="text-xs text-muted-foreground">Max CDF gap</p>
           </div>
           <div className="border rounded-lg p-3 text-center">
             <p className="text-xs text-muted-foreground">Live scores</p>
             <p className="text-2xl font-bold">{drift.n_live}</p>
-            <p className="text-xs text-muted-foreground">Last 24 h</p>
+            <p className="text-xs text-muted-foreground">
+              Distinct stays &middot; last 30 days
+            </p>
           </div>
         </div>
         <div className="text-xs text-muted-foreground space-y-1 border-t pt-3">
@@ -238,25 +247,25 @@ function AnalyticsContent() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <div className="border rounded-lg p-3 text-center">
               <p className="text-xs text-muted-foreground">AUC-ROC</p>
-              <p className="text-2xl font-bold">0.89</p>
+              <p className="text-2xl font-bold">0.74</p>
               <p className="text-xs text-muted-foreground">
-                Safe step-down vs readmission or death
+                95% CI 0.71–0.76 &middot; safe vs readmission or death in 72h
               </p>
             </div>
             <div className="border rounded-lg p-3 text-center">
               <p className="text-xs text-muted-foreground">
                 Readmission-only AUC
               </p>
-              <p className="text-2xl font-bold text-amber-600">0.63</p>
+              <p className="text-2xl font-bold text-amber-600">0.64</p>
               <p className="text-xs text-amber-600">
                 Bounce-backs alone remain hard
               </p>
             </div>
             <div className="border rounded-lg p-3 text-center">
               <p className="text-xs text-muted-foreground">Not-safe PR-AUC</p>
-              <p className="text-2xl font-bold">0.78</p>
+              <p className="text-2xl font-bold">0.23</p>
               <p className="text-xs text-muted-foreground">
-                vs 12% base rate
+                vs 4.7% base rate (~5&times; lift)
               </p>
             </div>
             <div className="border rounded-lg p-3 text-center">
@@ -270,16 +279,17 @@ function AnalyticsContent() {
 
           <div className="text-xs text-muted-foreground space-y-1 border-t pt-3">
             <p>
-              <strong>What changed in v3:</strong> the outcome now counts death
-              within 72h of leaving the ICU as an unsafe step-down (v2 counted
-              those patients as safe), and 23 lab, urine-output and
-              active-support features were added. Most of the AUC gain comes
-              from that clinically correct label.
+              <strong>What changed in v7:</strong> the model is trained and
+              tested only on patients who left the ICU alive &mdash; the
+              patients a step-down decision is actually made for. v6 also
+              included patients who died in the ICU; their final day is easy
+              to recognise and inflated its AUC to 0.89.
             </p>
             <p>
-              On the readmission-only subset (deaths excluded) the AUC is 0.63:
-              the model is strong at flagging patients at risk of dying, but
-              predicting 72h bounce-back alone remains difficult.
+              On the readmission-only subset (post-ICU deaths excluded) the AUC
+              is 0.64: predicting 72h bounce-back from structured data is
+              genuinely hard. The pilot validates the index on your patients
+              before clinicians rely on it.
             </p>
             <p className="font-medium text-foreground/70">
               This tool is decision support. All transfers must be clinically
@@ -373,7 +383,7 @@ function AnalyticsContent() {
             Global Feature Importance
           </CardTitle>
           <p className="text-xs text-muted-foreground">
-            Mean |SHAP| from v2 model evaluation — reflects model weights, not
+            Mean |SHAP| from v7 model evaluation — reflects model weights, not
             per-patient factors. Top 10 shown.
           </p>
         </CardHeader>
@@ -386,8 +396,8 @@ function AnalyticsContent() {
       <DriftMonitorTile drift={data.drift_status} />
 
       <p className="text-xs text-muted-foreground text-center pb-4">
-        MIMIC-III de-identified research data &middot; Model v6 &middot;
-        AUC-ROC 0.89 (readmission-only 0.63) &middot; For decision support only
+        MIMIC-III de-identified research data &middot; Model v7 &middot;
+        AUC-ROC 0.74 (readmission-only 0.64) &middot; For decision support only
       </p>
     </div>
   );

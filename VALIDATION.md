@@ -21,7 +21,7 @@ and [`evidence/`](evidence/) (raw run output), and [`DATA-JOURNEY.md`](DATA-JOUR
 | **Landing stage (replay)** | `icu_step_down.landing.{live_cohort, chart_events_feed, replay_clock}` | 40 frozen cohort / event stream / timing log | [`evidence/streaming-run.txt`](evidence/streaming-run.txt) |
 | **UC governance** | grants + PII tags; UC column masks on `subject_id` / `hadm_id`; `care_unit` secure views `census_governed`, `patient_features_governed` | Applied; fail-closed verified live | [`src/governance/pii_masking.sql`](src/governance/pii_masking.sql), [`src/governance/governance.sql`](src/governance/governance.sql), [`evidence/unit-access-verification.txt`](evidence/unit-access-verification.txt), [`evidence/pii-obfuscation.txt`](evidence/pii-obfuscation.txt) |
 | **PII masking functions** | `icu_step_down.gold.pseudonymize_id()`, `icu_step_down.gold.mask_patient_id()` | Deployed (deterministic SHA-256 pseudonym P-xxxxxxxx) | [`src/governance/pii_masking.sql`](src/governance/pii_masking.sql), [`evidence/pii-obfuscation.txt`](evidence/pii-obfuscation.txt) |
-| **ML model** | `icu_step_down.ml.readiness_model` **v6** (LightGBM + SHAP; 53 features; test AUC 0.891 / readmission-only 0.635 / not-safe PR-AUC 0.776) | Registered; served via `icu-readiness` endpoint | [`src/ml/train.py`](src/ml/train.py), [`evidence/05-ml-metrics.md`](evidence/05-ml-metrics.md) |
+| **ML model** | `icu_step_down.ml.readiness_model` **v7** (LightGBM + SHAP; 53 features; left-ICU-alive cohort; test AUC 0.735 [0.714–0.757] / readmission-only 0.643 / not-safe PR-AUC 0.230) | Registered; served via `icu-readiness` endpoint | [`src/ml/train.py`](src/ml/train.py), [`evidence/05-ml-metrics.md`](evidence/05-ml-metrics.md) |
 | **Model training job** | `icu-readiness-train` | Deployed (DAB bundle job; serverless; run via `databricks bundle run`) | [`resources/jobs.yml`](resources/jobs.yml), [`src/ml/train.py`](src/ml/train.py) |
 | **Model serving endpoint** | `icu-readiness` | Deployed ([live URL in log](evidence/bundle-deploy.log)) | [`evidence/serving-prediction.json`](evidence/serving-prediction.json) (real response), [`evidence/serving-prediction.txt`](evidence/serving-prediction.txt) |
 | **Genie space** | "ICU Step-Down Readiness" (see `space_config.md` for space ID) · 3 governed tables | Configured | [`evidence/genie-conversation.md`](evidence/genie-conversation.md) (live Q&A), [`src/genie/space_config.md`](src/genie/space_config.md) |
@@ -40,7 +40,7 @@ and serving-endpoint resources are bundle-deployed with live URLs.
 
 | Notebook | Cells with outputs | Purpose |
 |----------|--------------------|---------|
-| [`src/ml/train.ipynb`](src/ml/train.ipynb) | 6 / 6 code cells | Model training (LightGBM + SHAP), metrics, registration |
+| [`src/ml/train.ipynb`](src/ml/train.ipynb) | 6 / 6 code cells | Executed **v2** training run (LightGBM + SHAP), kept for its outputs. v7 is trained by [`src/ml/train.py`](src/ml/train.py) via the `icu-readiness-train` job |
 | [`evidence/execution-evidence.ipynb`](evidence/execution-evidence.ipynb) | 6 / 6 code cells | End-to-end run reproduction (pipeline counts, prediction, Genie, drift, app) |
 | `scripts/create synced tables for Lakebase mimic.ipynb` | partial | Lakebase sync utility (setup notebook) |
 
@@ -60,7 +60,7 @@ and serving-endpoint resources are bundle-deployed with live URLs.
 
 ## 4. Tests
 
-`evidence/test-run.log` — **198 backend + 37 frontend + 68 pipeline/ML unit + 26 live integration = 329 passing** (note: 1 integration test skipped pending replay completion; monitoring/genai/streaming integrated into root test suite).
+`evidence/test-run.log` — **199 backend + 40 frontend + 74 pipeline/ML unit + 28 live integration = 341 passing** (note: 1 integration test skipped pending replay completion; monitoring/genai/streaming integrated into root test suite).
 
 ## 5. Submission-guideline compliance
 

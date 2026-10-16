@@ -49,12 +49,13 @@ class TestGlobalFeatureImportance:
                 name in FEATURE_LABELS
             ), f"Feature '{name}' in importance list has no label in FEATURE_LABELS"
 
-    def test_top_feature_is_gcs(self) -> None:
-        """GCS leads in v6 (importance ~0.297). v2's lactate dominance was partly
-        leakage: it used post-ICU lactate values, fixed in the v3 pipeline."""
+    def test_top_feature_is_age(self) -> None:
+        """Age leads in v7 (importance ~0.275). v6's GCS / ventilation lead came
+        largely from in-ICU deaths, whose last-24h window is the last day of
+        life; v7 trains only on stays that left the ICU alive."""
         top_name, top_val = _GLOBAL_FEATURE_IMPORTANCE[0]
-        assert top_name == "gcs_last"
-        assert top_val == pytest.approx(0.29696, abs=1e-4)
+        assert top_name == "age"
+        assert top_val == pytest.approx(0.27475, abs=1e-4)
 
     def test_at_least_ten_features(self) -> None:
         assert len(_GLOBAL_FEATURE_IMPORTANCE) >= 10

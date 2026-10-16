@@ -70,9 +70,9 @@ WHERE vital_name IS NOT NULL
 
 ---
 
-## Gold — 24-hour feature engineering (`gold.patient_features`, 53 features, v6)
+## Gold — 24-hour feature engineering (`gold.patient_features`, 53 features)
 
-`gold.patient_features` (one row per ICU stay) is the governed feature set the model, app, and Genie all consume. v6 adds 23 new features (total 53; v2 was 30) after label correction and live-cohort out-of-sample exclusion (61,532 − 40 live = 61,492 training rows). Real logic from `src/pipelines/gold.sql`:
+`gold.patient_features` (one row per ICU stay) is the governed feature set the model, app, and Genie all consume. v6 added 23 new features (total 53; v2 was 30); v7 keeps them and trains on the 56,860 stays that left the ICU alive (see `readiness_training_set` below). Real logic from `src/pipelines/gold.sql`:
 
 ```sql
 -- 24-hour window ending at discharge (or intime + 1 day if still in unit)
@@ -143,7 +143,7 @@ END AS care_unit   -- synthetic (de-identified data); stable across re-runs
 
 ### Gold outputs built on `patient_features`
 
-- **`gold.readiness_training_set`** = `patient_features` + `readiness_label` + `label_reason` (1 = safe step-down, 0 = not safe). **v6 label fix:** safe = left ICU alive AND not readmitted AND no death within 72h (v2 incorrectly labelled 5,274 deaths as safe). Training set: 61,492 rows; 54,195 safe / 7,297 not safe (11.9% base rate); breakdown: 1,766 bounce-back, 5,521 death, 10 still_in_icu. Census excluded from training (out-of-sample).
+- **`gold.readiness_training_set`** = `patient_features` + `readiness_label` + `label_reason` (1 = safe step-down, 0 = not safe). **Cohort (v7): stays that left the ICU alive.** Safe = no ICU readmission and no death within 72h of leaving. Excluded: 4,622 deaths in the ICU (`died_in_icu`), 10 open stays and the 40 live census stays. Training set: 56,860 rows; 54,195 safe / 2,665 not safe (4.7%): 1,766 bounce-back, 899 death after leaving the ICU. (v2 labelled 5,274 deaths as safe; v6 relabelled them but kept the in-ICU deaths, which inflated its AUC to 0.89.)
 - **`gold.census`** = the 40 current ICU patients, so `care_unit` and guardrail signals propagate automatically.
 - **`gold.pii_audit`** = pipeline-managed table that scans `icu_step_down.information_schema.columns` for forbidden columns (DOB, raw identifiers) in silver/gold; expectation fails the pipeline if any exist (currently passing: 0 forbidden columns).
 - **`gold.census_serving` & `gold.patient_features_serving`** = same feature rows with pseudonymized identifiers (P-xxxxxxxx, stored not masked) to avoid double-masking when Lakebase syncs to Postgres. App reads `mimic_iii.census` and `mimic_iii.patient_features` from Postgres; no raw identifiers leak to the serving layer.

@@ -7,7 +7,8 @@ a job entrypoint (run_drift_check) that reads from Databricks tables and
 writes drift metrics to gold.readiness_drift.
 
 Thresholds (documented here as the canonical reference):
-    MIN_LIVE_SAMPLE = 30   — minimum live scores needed before reporting drift
+    MIN_LIVE_SAMPLE = 200  — minimum distinct live stays before reporting drift
+    LIVE_WINDOW_DAYS = 30  — live window (latest score per stay)
     PSI < 0.10             — stable
     PSI < 0.25             — moderate shift
     PSI >= 0.25            — drift
@@ -34,8 +35,16 @@ logger = logging.getLogger(__name__)
 # Constants
 # ---------------------------------------------------------------------------
 
-MIN_LIVE_SAMPLE: int = 30
-"""Minimum live-score sample size before drift metrics are meaningful."""
+MIN_LIVE_SAMPLE: int = 200
+"""Minimum distinct live stays before drift metrics are meaningful.
+
+PSI uses 10 baseline-decile bins, so ~20 stays per bin. On a single 40-patient
+census one empty decile alone adds ~2 to PSI (epsilon fill), so a "drift"
+verdict there is noise; below this it reports "insufficient"."""
+
+LIVE_WINDOW_DAYS: int = 30
+"""Live window. A 40-bed unit with ~3.5-day stays admits ~11 patients a day, so
+30 days gives ~370 distinct stays (7 days would give ~120, below the minimum)."""
 
 _PSI_STABLE_THRESHOLD: float = 0.10
 _PSI_MODERATE_THRESHOLD: float = 0.25
@@ -288,6 +297,17 @@ _BASELINE_TABLE = f"{_CATALOG}.gold.readiness_training_baseline"
 _HISTORY_TABLE = f"{_CATALOG}.gold.readiness_score_history"
 _DRIFT_TABLE = f"{_CATALOG}.gold.readiness_drift"
 
+# Latest score per stay in the window: each snapshot re-captures the whole
+# census, so counting rows would inflate n_live with the same patients.
+LIVE_SCORES_SQL = f"""
+SELECT readiness_score FROM (
+  SELECT readiness_score,
+         ROW_NUMBER() OVER (PARTITION BY icustay_id ORDER BY captured_at DESC) AS rn
+  FROM {_HISTORY_TABLE}
+  WHERE captured_at >= current_timestamp() - INTERVAL {LIVE_WINDOW_DAYS} DAYS
+) WHERE rn = 1
+"""
+
 # DDL for gold.readiness_drift (created by the job on first run if absent).
 _DRIFT_TABLE_DDL = f"""
 CREATE TABLE IF NOT EXISTS {_DRIFT_TABLE} (
@@ -317,13 +337,10 @@ def _databricks_baseline_reader() -> dict[str, Any]:  # pragma: no cover
 
 
 def _databricks_live_reader() -> list[float]:  # pragma: no cover
-    """Read recent live readiness scores from gold.readiness_score_history."""
+    """Latest live readiness score per stay from gold.readiness_score_history."""
     from databricks.sdk.runtime import spark  # type: ignore[import-not-found]
 
-    rows = spark.sql(
-        f"SELECT readiness_score FROM {_HISTORY_TABLE} "
-        "WHERE captured_at >= current_timestamp() - INTERVAL 24 HOURS"
-    ).collect()
+    rows = spark.sql(LIVE_SCORES_SQL).collect()
     return [float(r["readiness_score"]) for r in rows]
 
 

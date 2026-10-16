@@ -2,9 +2,9 @@
  * Frontend tests for the Analytics view (routes/analytics.tsx).
  *
  * Covers:
- * - AUC-ROC of 0.89 (v6) is the headline metric, shown next to the 0.63
- *   readmission-only AUC so the gain from the death-aware label is not hidden
- * - Not-safe PR-AUC of 0.78 is shown as the clinically meaningful precision metric
+ * - AUC-ROC of 0.74 (v7) is the headline metric, shown next to the 0.64
+ *   readmission-only AUC and explained by the left-the-ICU-alive cohort
+ * - Not-safe PR-AUC of 0.23 (vs 4.7% base rate) is the precision metric
  * - Band distribution chart renders
  * - Feature importance chart renders
  */
@@ -83,24 +83,30 @@ describe("AnalyticsContent — analytics view", () => {
     ).toBeInTheDocument();
   });
 
-  it("renders AUC-ROC 0.89 as the primary model quality metric", () => {
+  it("renders AUC-ROC 0.74 as the primary model quality metric", () => {
     renderAnalytics();
-    expect(screen.getByText("0.89")).toBeInTheDocument();
+    expect(screen.getByText("0.74")).toBeInTheDocument();
     // "AUC-ROC" label appears at least once (label in card + footer)
     expect(screen.getAllByText(/auc-roc/i).length).toBeGreaterThan(0);
   });
 
-  it("shows readmission-only AUC 0.63 alongside the headline — gain is not overstated", () => {
+  it("shows readmission-only AUC 0.64 alongside the headline — gain is not overstated", () => {
     renderAnalytics();
-    expect(screen.getByText("0.63")).toBeInTheDocument();
+    expect(screen.getByText("0.64")).toBeInTheDocument();
     expect(screen.getAllByText(/readmission-only/i).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/death/i).length).toBeGreaterThan(0);
   });
 
-  it("renders the not-safe PR-AUC 0.78 as the precision metric", () => {
+  it("renders the not-safe PR-AUC 0.23 as the precision metric", () => {
     renderAnalytics();
-    expect(screen.getByText("0.78")).toBeInTheDocument();
+    expect(screen.getByText("0.23")).toBeInTheDocument();
     expect(screen.getAllByText(/not-safe pr-auc/i).length).toBeGreaterThan(0);
+  });
+
+  it("explains that the model is evaluated only on patients who left the ICU alive", () => {
+    renderAnalytics();
+    expect(screen.getByText(/left the ICU alive/i)).toBeInTheDocument();
+    expect(screen.queryByText("0.89")).not.toBeInTheDocument();
   });
 
   it("renders the Honest Assessment framing card", () => {
@@ -151,5 +157,24 @@ describe("AnalyticsContent — analytics view", () => {
     render(<AnalyticsContent />);
     expect(screen.getByText(/model drift monitor/i)).toBeInTheDocument();
     expect(screen.getByText(/daily drift-check job has not run/i)).toBeInTheDocument();
+  });
+
+  it("does not show a PSI number when the live sample is too small to judge drift", () => {
+    (useGetAnalyticsSuspense as ReturnType<typeof vi.fn>).mockReturnValue({
+      data: {
+        ...MOCK_ANALYTICS,
+        drift_status: { ...MOCK_DRIFT, psi: 4.953, verdict: "insufficient", n_live: 40 },
+      },
+    });
+    render(<AnalyticsContent />);
+    expect(screen.getByText("Insufficient data")).toBeInTheDocument();
+    expect(screen.queryByText("4.953")).not.toBeInTheDocument();
+    expect(screen.getByText("Needs 200+ stays")).toBeInTheDocument();
+    expect(screen.getByText(/fewer than 200 distinct stays/i)).toBeInTheDocument();
+  });
+
+  it("labels live scores as distinct stays over the 30-day window", () => {
+    renderAnalytics();
+    expect(screen.getByText(/distinct stays · last 30 days/i)).toBeInTheDocument();
   });
 });

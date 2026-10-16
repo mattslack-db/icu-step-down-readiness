@@ -128,8 +128,8 @@ def build() -> DrawioDoc:
         ("Safety guardrail", "Life support (24h) → never Ready"),
     ], header_fill=PANEL_HDR)
     mosaic = section(doc, "ml", sx + sw_ + gap, sy, sw_, "Mosaic AI", [
-        ("Training job · MLflow", "LightGBM, 53 features · AUC 0.89"),
-        ("UC model · readiness_model v6", "Versioned, lineage to gold"),
+        ("Training job · MLflow", "LightGBM, 53 features · AUC 0.74"),
+        ("UC model · readiness_model v7", "Versioned, lineage to gold"),
         ("Serving · icu-readiness", "Scores + SHAP for app and pipeline"),
     ], header_fill=TEAL)
     lake = section(doc, "lb", sx + 2 * (sw_ + gap), sy, sw_, "Lakebase (Postgres)", [

@@ -28,7 +28,7 @@ so it is readable by reviewers; the full asset manifest is in
 
 | File | Notes |
 |------|-------|
-| [`train.ipynb`](train.ipynb) | Copy of `../src/ml/train.ipynb` — model training (LightGBM + SHAP), 6/6 code cells with outputs |
+| [`train.ipynb`](train.ipynb) | Copy of `../src/ml/train.ipynb` — the executed **v2** training run (LightGBM + SHAP), 6/6 code cells with outputs. v7 is trained by `src/ml/train.py` |
 | [`execution-evidence.ipynb`](execution-evidence.ipynb) | End-to-end run reproduction, 6/6 code cells with outputs |
 
 ## Diagrams, phase notes, and media
