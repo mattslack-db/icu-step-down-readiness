@@ -35,7 +35,7 @@ unit-level access control.
 3. **Subagent-driven execution**: each task implemented by a fresh subagent, then
    checked by a separate reviewer subagent (spec compliance + code quality), with
    a fix loop, then a whole-branch review at the end. Progress tracked in a ledger.
-4. **TDD throughout**: tests written first; 199 backend + 38 frontend + 71
+4. **TDD throughout**: tests written first; 199 backend + 40 frontend + 74
    pipeline/ML unit + 28 live integration pass (see [`evidence/test-run.log`](evidence/test-run.log)).
 5. **Live verification**: pipeline, serving, Genie, Lakebase, app, drift, and
    unit-access all exercised against the sandbox; verbatim output committed

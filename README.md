@@ -20,7 +20,7 @@ Headline results, as committed text:
 - **Real served prediction** (Mosaic AI `icu-readiness`; captured on model v2 — the endpoint now serves v7): `readiness_score 0.4739` with factors `lactate_last (risk 0.262)`, `on_ventilator (risk 0.030)`, … — `on_ventilator` shown as **risk** (safety override, live). ([`evidence/serving-prediction.txt`](evidence/serving-prediction.txt))
 - **Genie Q&A** over the governed tables: *"How many current ICU patients are ready for step-down?"* → generated SQL → `ready=38, not_ready=2, total=40`. ([`evidence/genie-qa.txt`](evidence/genie-qa.txt))
 - **Deployed app RUNNING** + Lakebase synced tables ONLINE; **drift job** PSI 2.15 / KS 0.22; **unit-access** scoped predicate returns 15 MICU rows live. ([`evidence/app-deploy.txt`](evidence/app-deploy.txt), [`evidence/drift-run.txt`](evidence/drift-run.txt), [`evidence/unit-access-verification.txt`](evidence/unit-access-verification.txt))
-- **Test suites passing:** 199 backend + 38 frontend + 71 pipeline/ML unit + 28 live integration = **336 passing** — committed run output in [`evidence/test-run.log`](evidence/test-run.log).
+- **Test suites passing:** 199 backend + 40 frontend + 74 pipeline/ML unit + 28 live integration = **341 passing** — committed run output in [`evidence/test-run.log`](evidence/test-run.log).
 
 **Want the transformation logic end to end?** The full bronze→silver→gold medallion SQL and the Genie space configuration are reproduced readably in **[`DATA-JOURNEY.md`](DATA-JOURNEY.md)** (source in [`src/pipelines/`](src/pipelines/) and [`src/genie/`](src/genie/)).
 
@@ -82,7 +82,7 @@ flowchart LR
 | Surface | Databricks App (React + FastAPI) | Census dashboard, patient detail, analytics | [07-app-api](evidence/07-app-api.md) · [07-app-deploy](evidence/07-app-deploy.md) |
 | Provision | FEVM + DABs | AWS serverless sandbox; all assets via Asset Bundles | [00-provisioning](evidence/00-provisioning.md) |
 | Data access | Delta Sharing | Cross-metastore D2D share of the source | [01-data-access](evidence/01-data-access.md) |
-| Tests | pytest + vitest | 199 backend + 38 frontend + 71 pipeline/ML unit + 28 live integration — run output in [`evidence/test-run.log`](evidence/test-run.log) | [08-tests](evidence/08-tests.md) |
+| Tests | pytest + vitest | 199 backend + 40 frontend + 74 pipeline/ML unit + 28 live integration — run output in [`evidence/test-run.log`](evidence/test-run.log) | [08-tests](evidence/08-tests.md) |
 
 All evidence files contain **committed, text-readable run output** (row counts, query results, model metrics, deploy logs) — not screenshots.
 

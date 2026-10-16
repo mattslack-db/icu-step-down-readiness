@@ -158,4 +158,23 @@ describe("AnalyticsContent — analytics view", () => {
     expect(screen.getByText(/model drift monitor/i)).toBeInTheDocument();
     expect(screen.getByText(/daily drift-check job has not run/i)).toBeInTheDocument();
   });
+
+  it("does not show a PSI number when the live sample is too small to judge drift", () => {
+    (useGetAnalyticsSuspense as ReturnType<typeof vi.fn>).mockReturnValue({
+      data: {
+        ...MOCK_ANALYTICS,
+        drift_status: { ...MOCK_DRIFT, psi: 4.953, verdict: "insufficient", n_live: 40 },
+      },
+    });
+    render(<AnalyticsContent />);
+    expect(screen.getByText("Insufficient data")).toBeInTheDocument();
+    expect(screen.queryByText("4.953")).not.toBeInTheDocument();
+    expect(screen.getByText("Needs 200+ stays")).toBeInTheDocument();
+    expect(screen.getByText(/fewer than 200 distinct stays/i)).toBeInTheDocument();
+  });
+
+  it("labels live scores as distinct stays over the 30-day window", () => {
+    renderAnalytics();
+    expect(screen.getByText(/distinct stays · last 30 days/i)).toBeInTheDocument();
+  });
 });

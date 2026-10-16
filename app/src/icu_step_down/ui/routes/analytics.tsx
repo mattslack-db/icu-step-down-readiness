@@ -118,7 +118,7 @@ const VERDICT_CONFIG: Record<
     label: "Insufficient data",
     colorClass: "border-muted",
     textClass: "text-muted-foreground",
-    desc: "Not enough live scores to assess drift reliably.",
+    desc: "Fewer than 200 distinct stays scored in the last 30 days — PSI is not reliable on a sample this small, so no drift verdict is given.",
   },
 };
 
@@ -147,6 +147,9 @@ function DriftMonitorTile({ drift }: { drift: DriftStatus | null | undefined }) 
 
   const config =
     VERDICT_CONFIG[drift.verdict] ?? VERDICT_CONFIG["insufficient"];
+  // PSI on a small sample is noise (one empty decile adds ~2): don't show a
+  // number next to "Insufficient data" that reads as drift.
+  const hasVerdict = drift.verdict !== "insufficient";
 
   return (
     <Card className={config.colorClass}>
@@ -168,26 +171,32 @@ function DriftMonitorTile({ drift }: { drift: DriftStatus | null | undefined }) 
           </div>
           <div className="border rounded-lg p-3 text-center">
             <p className="text-xs text-muted-foreground">PSI</p>
-            <p className="text-2xl font-bold">{drift.psi.toFixed(3)}</p>
+            <p className="text-2xl font-bold">
+              {hasVerdict ? drift.psi.toFixed(3) : "—"}
+            </p>
             <p className="text-xs text-muted-foreground">
-              {drift.psi < 0.10
-                ? "< 0.10 stable"
-                : drift.psi < 0.25
-                  ? "0.10–0.25 moderate"
-                  : "≥ 0.25 drift"}
+              {!hasVerdict
+                ? "Needs 200+ stays"
+                : drift.psi < 0.10
+                  ? "< 0.10 stable"
+                  : drift.psi < 0.25
+                    ? "0.10–0.25 moderate"
+                    : "≥ 0.25 drift"}
             </p>
           </div>
           <div className="border rounded-lg p-3 text-center">
             <p className="text-xs text-muted-foreground">KS</p>
             <p className="text-2xl font-bold">
-              {drift.ks != null ? drift.ks.toFixed(3) : "—"}
+              {hasVerdict && drift.ks != null ? drift.ks.toFixed(3) : "—"}
             </p>
             <p className="text-xs text-muted-foreground">Max CDF gap</p>
           </div>
           <div className="border rounded-lg p-3 text-center">
             <p className="text-xs text-muted-foreground">Live scores</p>
             <p className="text-2xl font-bold">{drift.n_live}</p>
-            <p className="text-xs text-muted-foreground">Last 24 h</p>
+            <p className="text-xs text-muted-foreground">
+              Distinct stays &middot; last 30 days
+            </p>
           </div>
         </div>
         <div className="text-xs text-muted-foreground space-y-1 border-t pt-3">

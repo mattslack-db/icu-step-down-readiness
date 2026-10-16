@@ -169,12 +169,14 @@ The narrative model only paraphrases those factors; it doesn't score anything."
   decision is made for. It's good at putting the riskiest patients at the bottom
   of the list; predicting readmission alone is still hard, and we show that on
   the screen."
-- **Drift tile** (PSI / KS against the training baseline, checked daily).
+- **Drift tile** (PSI / KS of live scores against a baseline over every
+  historical stay, checked daily).
 
-> Note for the day: in a fresh environment the latest drift run may show verdict
-> **"insufficient"** (no live scores in the last 24 h) with a large PSI number.
-> Say: "the monitor correctly refuses to call drift on too little live data" —
-> don't read the PSI value out loud.
+> Note for the day: the tile shows **"Insufficient data"** with PSI hidden. The
+> demo census is 40 patients, and the monitor needs 200+ distinct stays over 30
+> days before it calls drift. Say: "On 40 patients a drift number is noise, so
+> the monitor refuses to give a verdict. In a pilot, a 40-bed unit gets there in
+> about two weeks."
 
 **Tell (business landing).**
 > "You get a weekly answer to two questions your board will ask: are we moving
@@ -243,7 +245,7 @@ model → **Lakebase** (Postgres, pseudonymised copies) for fast app reads →
 > For the exec: "One platform, one copy of the data, one set of permissions —
 > fewer vendors and fewer places for patient data to leak."
 > For the architect: "Everything you saw deploys from code with Asset Bundles,
-> and there's a test suite behind it — 199 backend, 38 frontend, 71 pipeline and
+> and there's a test suite behind it — 199 backend, 40 frontend, 74 pipeline and
 > ML unit tests, and 28 live integration tests that check things like 'no date of
 > birth anywhere in silver or gold'. I re-stood this whole environment up from the
 > repo this week."
@@ -528,7 +530,7 @@ then invite:
 | PII | DOB dropped; age capped 90; 0 expectation failures; 0 raw IDs in Postgres | `evidence/pii-obfuscation.txt` |
 | Streaming latency | bronze ~5 s · gold + scores ~2 min · Lakebase ~40 s | `evidence/streaming-run.txt` |
 | Demo census | 40 stays; MICU 15 · SICU 10 · CCU 15 (synthetic units) | `evidence/care-unit-distribution.txt` |
-| Tests | 199 backend · 38 frontend · 71 unit · 28 live integration | `evidence/test-run.log` |
+| Tests | 199 backend · 40 frontend · 74 unit · 28 live integration | `evidence/test-run.log` |
 | Narrative model | `databricks-meta-llama-3-3-70b-instruct` | `src/genai/narrative.py` |
 | Target outcome | 10–15% ICU LOS reduction; $2–5k per avoided ICU day | deck slide 4 |
 

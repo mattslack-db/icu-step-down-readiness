@@ -60,7 +60,7 @@ and serving-endpoint resources are bundle-deployed with live URLs.
 
 ## 4. Tests
 
-`evidence/test-run.log` — **199 backend + 38 frontend + 71 pipeline/ML unit + 28 live integration = 336 passing** (note: 1 integration test skipped pending replay completion; monitoring/genai/streaming integrated into root test suite).
+`evidence/test-run.log` — **199 backend + 40 frontend + 74 pipeline/ML unit + 28 live integration = 341 passing** (note: 1 integration test skipped pending replay completion; monitoring/genai/streaming integrated into root test suite).
 
 ## 5. Submission-guideline compliance
 
