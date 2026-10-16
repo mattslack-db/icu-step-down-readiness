@@ -24,7 +24,6 @@ DATA = Path(__file__).parent / "data"
 PARAMS = dict(n_estimators=2000, num_leaves=63, max_depth=6, learning_rate=0.05,
               min_child_samples=20, reg_alpha=0.1, reg_lambda=1.0,
               class_weight="balanced", random_state=42, n_jobs=-1, verbose=-1)
-RNG = np.random.default_rng(0)
 
 
 def load() -> tuple[pd.DataFrame, list[str]]:
@@ -63,11 +62,15 @@ def fit(tr, va, cols, params=PARAMS):
 
 
 def ci(y, p, n=1000):
+    """95% percentile bootstrap — same method and seed as bootstrap_auc_ci in
+    src/ml/train.py (a Databricks notebook, so not importable here). A fresh
+    RNG per call keeps each run's CI independent of the runs before it."""
+    rng = np.random.default_rng(0)
     y, p = np.asarray(y), np.asarray(p)
     point = roc_auc_score(y, p)
     stats = []
     for _ in range(n):
-        i = RNG.integers(0, len(y), len(y))
+        i = rng.integers(0, len(y), len(y))
         if y[i].min() != y[i].max():
             stats.append(roc_auc_score(y[i], p[i]))
     lo, hi = np.percentile(stats, [2.5, 97.5])

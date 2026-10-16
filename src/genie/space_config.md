@@ -43,14 +43,15 @@ Four Unity Catalog tables are attached (2026-10-12: `gold.census_scores_governed
 
 ### 2. `icu_step_down.gold.readiness_training_set`
 
-**Purpose:** Historical ICU stays with 24-hour vital aggregates and step-down readiness outcomes.  
-**Row count:** 61,532  
+**Purpose:** Historical ICU stays that **left the ICU alive**, with 24-hour vital aggregates and step-down outcomes. Deaths in the ICU, open stays and the 40 live census stays are excluded, so this table cannot answer ICU mortality questions.  
+**Row count:** 56,860  
 **Key fields:**
 
 | Column | Type | Description |
 |--------|------|-------------|
 | `icustay_id` | string | ICU stay ID. Joins to `census` and `silver.vital_signs`. |
-| `readiness_label` | int | **1** = safe step-down (no bounce-back). **0** = returned to ICU within 72h (bounce-back). 97% are label=1 (59,706 ready; 1,826 bounce-back). |
+| `readiness_label` | int | **1** = safe step-down: no ICU readmission and no death within 72h of leaving the ICU. **0** = not safe. ~95% are label=1 (54,195 safe; 2,665 not safe). |
+| `label_reason` | string | Why: `safe`, `bounce_back` (readmitted to the ICU within 72h — 1,766) or `death` (died within 72h of leaving the ICU — 899). Bounce-back = `label_reason = 'bounce_back'`, not `readiness_label = 0`. |
 | `age` | decimal | Patient age in years. |
 | `los` | string | ICU length of stay in **days** (cast to DOUBLE). NULL for 10 rows. |
 | `hr_mean` | double | Mean heart rate (bpm). NULL for ~41% of stays. |

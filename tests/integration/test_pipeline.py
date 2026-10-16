@@ -224,6 +224,21 @@ class TestGoldReadinessTrainingSet:
         assert excluded == 0, f"{excluded} rows with an excluded label_reason"
         assert died_in_icu == 0, f"{died_in_icu} in-ICU deaths / open stays in the training set"
 
+    def test_row_count_is_every_eligible_stay(self, sandbox_conn) -> None:
+        """Nothing is dropped silently: training set = patient_features − live cohort
+        − in-ICU deaths − open stays (e.g. a lossy join would shrink it)."""
+        expected, actual = _one(sandbox_conn, """
+            SELECT
+              (SELECT COUNT(*)
+                 FROM icu_step_down.gold.patient_features pf
+                 JOIN icu_step_down.silver.icu_stays s ON s.icustay_id = pf.icustay_id
+                 LEFT ANTI JOIN icu_step_down.landing.live_cohort c ON c.icustay_id = pf.icustay_id
+                WHERE s.outtime IS NOT NULL
+                  AND NOT COALESCE(s.deathtime <= s.outtime + INTERVAL 1 HOUR, FALSE)),
+              (SELECT COUNT(*) FROM icu_step_down.gold.readiness_training_set)
+            """)
+        assert actual == expected, f"training set has {actual} rows; {expected} stays are eligible"
+
     def test_deaths_within_72h_are_labelled_not_safe(self, sandbox_conn) -> None:
         """Death within 72h of leaving the ICU is never 'safe'."""
         row = _one(sandbox_conn, """

@@ -243,8 +243,8 @@ model → **Lakebase** (Postgres, pseudonymised copies) for fast app reads →
 > For the exec: "One platform, one copy of the data, one set of permissions —
 > fewer vendors and fewer places for patient data to leak."
 > For the architect: "Everything you saw deploys from code with Asset Bundles,
-> and there's a test suite behind it — 199 backend, 38 frontend, 69 pipeline and
-> ML unit tests, and 27 live integration tests that check things like 'no date of
+> and there's a test suite behind it — 199 backend, 38 frontend, 71 pipeline and
+> ML unit tests, and 28 live integration tests that check things like 'no date of
 > birth anywhere in silver or gold'. I re-stood this whole environment up from the
 > repo this week."
 
@@ -528,7 +528,7 @@ then invite:
 | PII | DOB dropped; age capped 90; 0 expectation failures; 0 raw IDs in Postgres | `evidence/pii-obfuscation.txt` |
 | Streaming latency | bronze ~5 s · gold + scores ~2 min · Lakebase ~40 s | `evidence/streaming-run.txt` |
 | Demo census | 40 stays; MICU 15 · SICU 10 · CCU 15 (synthetic units) | `evidence/care-unit-distribution.txt` |
-| Tests | 199 backend · 38 frontend · 69 unit · 27 live integration | `evidence/test-run.log` |
+| Tests | 199 backend · 38 frontend · 71 unit · 28 live integration | `evidence/test-run.log` |
 | Narrative model | `databricks-meta-llama-3-3-70b-instruct` | `src/genai/narrative.py` |
 | Target outcome | 10–15% ICU LOS reduction; $2–5k per avoided ICU day | deck slide 4 |
 

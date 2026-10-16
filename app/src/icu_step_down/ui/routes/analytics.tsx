@@ -374,7 +374,7 @@ function AnalyticsContent() {
             Global Feature Importance
           </CardTitle>
           <p className="text-xs text-muted-foreground">
-            Mean |SHAP| from v2 model evaluation — reflects model weights, not
+            Mean |SHAP| from v7 model evaluation — reflects model weights, not
             per-patient factors. Top 10 shown.
           </p>
         </CardHeader>

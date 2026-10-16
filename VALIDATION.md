@@ -40,7 +40,7 @@ and serving-endpoint resources are bundle-deployed with live URLs.
 
 | Notebook | Cells with outputs | Purpose |
 |----------|--------------------|---------|
-| [`src/ml/train.ipynb`](src/ml/train.ipynb) | 6 / 6 code cells | Model training (LightGBM + SHAP), metrics, registration |
+| [`src/ml/train.ipynb`](src/ml/train.ipynb) | 6 / 6 code cells | Executed **v2** training run (LightGBM + SHAP), kept for its outputs. v7 is trained by [`src/ml/train.py`](src/ml/train.py) via the `icu-readiness-train` job |
 | [`evidence/execution-evidence.ipynb`](evidence/execution-evidence.ipynb) | 6 / 6 code cells | End-to-end run reproduction (pipeline counts, prediction, Genie, drift, app) |
 | `scripts/create synced tables for Lakebase mimic.ipynb` | partial | Lakebase sync utility (setup notebook) |
 
@@ -60,7 +60,7 @@ and serving-endpoint resources are bundle-deployed with live URLs.
 
 ## 4. Tests
 
-`evidence/test-run.log` — **199 backend + 38 frontend + 69 pipeline/ML unit + 27 live integration = 333 passing** (note: 1 integration test skipped pending replay completion; monitoring/genai/streaming integrated into root test suite).
+`evidence/test-run.log` — **199 backend + 38 frontend + 71 pipeline/ML unit + 28 live integration = 336 passing** (note: 1 integration test skipped pending replay completion; monitoring/genai/streaming integrated into root test suite).
 
 ## 5. Submission-guideline compliance
 
