@@ -30,12 +30,12 @@ biggest live risk.
 - [ ] Deck open on slide 1 (`deck/icu-step-down-readiness.pdf`).
 - [ ] Keep `evidence/` / `VALIDATION.md` one tab away for "prove it" questions.
 
-## 1. Timing plan (≈25 min)
+## 1. Timing plan (≈26 min)
 
 | Block | Time | Altitude |
 |---|---|---|
 | Open + agenda + confirm priorities | 2 min | Exec |
-| Demo setup (customer, problem, what you'll show) | 2 min | Exec |
+| Demo setup (customer, problem, customer story, what you'll show) | 3 min | Exec |
 | Demo: A census → B patient → C analytics → D Genie → D2 live stream → E platform | 11–13 min | Tell (exec) · Show · Tell (exec), with 1–2 technical asides |
 | Land the value + the ask | 3 min | Exec |
 | Q&A / objections | 6–10 min | Switch per asker |
@@ -46,7 +46,7 @@ technical stakeholder said "running in production" was their concern.
 
 ---
 
-## 2. Open and demo setup (≈4 min) — *deck slides 1–4*
+## 2. Open and demo setup (≈5 min) — *deck slides 1–5*
 
 **Open (to both, ~45 s).**
 > "Thanks for the time. I've got about twenty minutes of content and I want to
@@ -64,15 +64,43 @@ technical stakeholder said "running in production" was their concern.
 Use their answers to choose which segment to linger on. Repeat their words back
 later ("you mentioned diversions…").
 
-**Frame the problem (slide 2–3, ~1 min).**
+**Frame the problem (slide 2, ~45 s).**
 > "Your ICUs run at 70 to 90 percent occupancy. At that level, one bed held a day
 > longer than needed is the bed you don't have for the next emergent admission.
 > Today the step-down call is made on rounds, by memory and judgment, and it
 > varies by provider and by shift — so the system defaults to 'keep them to be
-> safe.' Each extra day is unreimbursed cost under DRG contracts, and it shows up
+> safe.'"
+
+**Customer story (slide 3, ~1 min) — tell · show · tell.**
+> Tell: "Let me make that concrete with one morning. This hospital is made up —
+> a composite of what ICU teams describe — but I suspect it'll sound familiar."
+>
+> Show the left column, then the right:
+> - "Seven a.m., Northbridge Regional. The ICU is full and two critical patients
+>   are waiting in the ED. Today the team rounds in bed order. The first step-down
+>   call comes at eleven-thirty, one stable patient is kept 'to be safe', the ED
+>   patients board for seven hours, and an elective cardiac case is postponed."
+> - "Same morning with the readiness index. The charge nurse opens a census that's
+>   already ranked, so rounds start with the five most-ready patients. Two are
+>   confirmed by eight-fifteen and moved by ten. Notice bed 3: it ranks high, but
+>   it was on a ventilator overnight, so the tool caps it at Borderline and it
+>   stays. That's the guardrail you'll see in the demo."
+>
+> Tell: "The decision never left the intensivist. What changed is where they
+> started, and that the reasons were on the screen."
+>
+> *Reading the room:* ask the business stakeholder, "Is that close to a morning
+> in your ICU?" Their answer tells you whether to push capacity or cost next.
+>
+> *Always say it's illustrative.* Never present Northbridge as a real customer or
+> its times as results. If asked: "It's a composite. The real numbers are what
+> the pilot measures."
+
+**Why it matters beyond the unit (slide 4, ~20 s).**
+> "And each extra day is unreimbursed cost under DRG contracts, and it shows up
 > on your LOS benchmarks against peers."
 
-**Name the outcome (slide 4, ~30 s).**
+**Name the outcome (slide 5, ~30 s).**
 > "What we're aiming for is a 10 to 15 percent reduction in ICU length of stay,
 > with the safe-transfer rate held or improved. Not by automating discharge —
 > by giving the team a consistent, explainable shortlist every shift."
@@ -230,12 +258,12 @@ continuously, and the pipeline scores the census through the serving endpoint
 with `ai_query`. In a pilot the feed is your ADT/charting extract instead of a
 replay."
 
-### Segment E — Platform underneath (≈1.5 min) — *slides 5–6, then slide 8*
+### Segment E — Platform underneath (≈1.5 min) — *slides 6–7, then slide 9*
 
 **Tell.** "Ninety seconds on what's underneath, because it's what makes this
 repeatable at your scale."
 
-**Show (slide 5 flow, slide 6 architecture).** Source → **Lakeflow** medallion, **continuously
+**Show (slide 6 flow, slide 7 architecture).** Source → **Lakeflow** medallion, **continuously
 streaming** (bronze → silver → gold) → **Unity Catalog** (lineage, DOB removed,
 identifier masks, row-level access) → **Mosaic AI model serving** + foundation
 model → **Lakebase** (Postgres, pseudonymised copies) for fast app reads →
@@ -252,7 +280,7 @@ model → **Lakebase** (Postgres, pseudonymised copies) for fast app reads →
 
 ---
 
-## 4. Land the value and the ask (≈3 min) — *slide 4, slide 10 (plan) + slide 11 (ask)*
+## 4. Land the value and the ask (≈3 min) — *slide 5, slide 11 (plan) + slide 12 (ask)*
 
 **Value math — do it with their numbers, not ours.** Ask for ICU beds, occupancy
 and average LOS; if they won't give them, use this illustration and say so:
@@ -268,11 +296,11 @@ and average LOS; if they won't give them, use this illustration and say so:
 > electives you can now say yes to depends on how full you are — and that's
 > exactly what the pilot measures."
 
-> ⚠ Slide 4's footnote says "0.8-day average LOS reduction". At a typical ICU LOS
+> ⚠ Slide 5's footnote says "0.8-day average LOS reduction". At a typical ICU LOS
 > of 3–4 days that is 20–25% — above the 10–15% headline. Don't quote 0.8 days;
 > use the table above, or fix the slide.
 
-**The plan (slide 10) — tell · show · tell, ~1 min.**
+**The plan (slide 11) — tell · show · tell, ~1 min.**
 > Tell: "Here's how we'd earn your clinicians' trust before anyone relies on this."
 >
 > Show the four phases, left to right:
@@ -302,7 +330,7 @@ and average LOS; if they won't give them, use this illustration and say so:
 > so it's a source change. Eight weeks of clinician pilot in one ICU gives a
 > first read on LOS; we keep tracking 72h bounce-back after the go / no-go."
 
-**The ask (slide 11).**
+**The ask (slide 12).**
 > To the business stakeholder: "Sponsor the plan, with an 8-week clinician pilot
 > in one ICU. We score it on two numbers you already report: ICU length of stay,
 > with the safe-transfer rate held or improved — 72-hour bounce-back not going up."
@@ -338,7 +366,7 @@ bridge to the other persona if useful → check ("does that address it?")**.
 > "The platform piece is already built — you watched me re-deploy it from code.
 > The time goes into two things: getting a governed EHR extract landed and the
 > model retrained on your history, then your clinicians validating it — silently
-> first, then on rounds. That's the plan on slide 10: about four weeks to a
+> first, then on rounds. That's the plan on slide 11: about four weeks to a
 > validated model on your data, a four-week silent pilot, then an eight-week
 > clinician pilot where we measure LOS — a go / no-go in about four months."
 
@@ -511,6 +539,7 @@ then invite:
 - **Do** volunteer the AUC caveats (readmission-only 0.64; in-ICU deaths excluded) and the
   MIMIC/replayed census before you're asked.
 - **Don't** quote clinical outcome results — none exist yet; the pilot creates them.
+- **Do** call the Northbridge story illustrative every time; **don't** let it pass as a reference customer.
 - **Don't** invent pricing; offer to size it.
 - **Do** end each demo segment with a one-sentence business "so what".
 
@@ -526,13 +555,13 @@ then invite:
 | Not-safe PR-AUC | 0.230 vs 4.7% base rate (~4.9× lift) | `evidence/05-ml-metrics.md` |
 | Features | 53 (v2: 30) — top: age, BUN, urine output, GCS | `evidence/05-ml-metrics.md` |
 | App = pipeline = Genie | all 40 census patients: same score, index and band | `evidence/app-pipeline-score-parity.txt` |
-| Project plan | wk 1–4 train on your history · wk 5–8 silent pilot · wk 9–16 clinician pilot (one ICU) · wk 17+ scale | deck slide 10 |
+| Project plan | wk 1–4 train on your history · wk 5–8 silent pilot · wk 9–16 clinician pilot (one ICU) · wk 17+ scale | deck slide 11 |
 | PII | DOB dropped; age capped 90; 0 expectation failures; 0 raw IDs in Postgres | `evidence/pii-obfuscation.txt` |
 | Streaming latency | bronze ~5 s · gold + scores ~2 min · Lakebase ~40 s | `evidence/streaming-run.txt` |
 | Demo census | 40 stays; MICU 15 · SICU 10 · CCU 15 (synthetic units) | `evidence/care-unit-distribution.txt` |
 | Tests | 199 backend · 40 frontend · 74 unit · 28 live integration | `evidence/test-run.log` |
 | Narrative model | `databricks-meta-llama-3-3-70b-instruct` | `src/genai/narrative.py` |
-| Target outcome | 10–15% ICU LOS reduction; $2–5k per avoided ICU day | deck slide 4 |
+| Target outcome | 10–15% ICU LOS reduction; $2–5k per avoided ICU day | deck slide 5 |
 
 ---
 
