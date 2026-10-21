@@ -41,6 +41,17 @@
   .dot:hover{background:var(--muted)}
   .dot[aria-current="step"]{background:var(--accent);transform:scale(1.35)}
   .counter{justify-self:end;font-variant-numeric:tabular-nums;font-weight:600}
+  .story{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:6px}
+  .story .card{padding:16px 20px}
+  .story h3{margin:0 0 8px;font-size:15px;letter-spacing:.04em;text-transform:uppercase}
+  .story .before h3{color:var(--muted)} .story .after h3{color:var(--green)}
+  .story ol{list-style:none;margin:0;padding:0}
+  .story li{display:grid;grid-template-columns:78px 1fr;gap:8px;font-size:clamp(13px,1.3vw,16px);line-height:1.4;margin:.45em 0}
+  .story time{font-weight:700;font-variant-numeric:tabular-nums;color:var(--muted)}
+  .story .after time{color:var(--green)}
+  .quote{margin:14px 0 0;padding:10px 16px;border-left:4px solid var(--accent);font-size:clamp(15px,1.6vw,19px)}
+  .quote cite{display:block;font-style:normal;font-size:13px;color:var(--muted);margin-top:4px}
+  .fineprint{font-size:12px;color:var(--muted);margin-top:10px}
   .stat.amber{color:var(--amber)}
   .timeline{display:flex;gap:4px;margin:6px 0 14px;font-size:12px;font-weight:700;color:#fff}
   .timeline span{padding:7px 10px;border-radius:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -94,6 +105,33 @@
       <div class="card"><div class="stat">"To be safe"</div><div class="label">Clinicians hold patients longer than needed, lengthening stays</div></div>
     </div>
     <p class="muted" style="margin-top:18px">The question every intensivist asks on rounds — <em>“who can safely move to step-down today?”</em> — has no consistent, data-driven answer.</p>
+  </section>
+
+  <section class="slide">
+    <div class="kicker">Customer story · Northbridge Regional (illustrative)</div>
+    <h2>7 a.m.: a full ICU, and two critical patients waiting in the ED</h2>
+    <div class="story">
+      <div class="card before">
+        <h3>A typical morning today</h3>
+        <ol>
+          <li><time>7:00</time><span>Rounds start at bed 1; all 24 patients reviewed in bed order</span></li>
+          <li><time>11:30</time><span>First step-down call made; one stable patient kept another day &ldquo;to be safe&rdquo;</span></li>
+          <li><time>14:00</time><span>Beds finally free; ED patients have boarded for 7 hours</span></li>
+          <li><time>15:00</time><span>Elective cardiac case postponed for lack of a post-op ICU bed</span></li>
+        </ol>
+      </div>
+      <div class="card after">
+        <h3>The same morning with the readiness index</h3>
+        <ol>
+          <li><time>6:45</time><span>Charge nurse opens the census already ranked; the team starts rounds with the five most-ready patients</span></li>
+          <li><time>8:15</time><span>Beds 7 and 12 confirmed ready: one off pressors for 36 hours, one extubated and stable. Bed 3 ranks high but was ventilated overnight, so it's capped at Borderline and stays</span></li>
+          <li><time>10:00</time><span>Both transfers complete; the two ED patients are in ICU beds by 11:00</span></li>
+          <li><time>Next day</time><span>Elective case goes ahead; neither transferred patient bounces back</span></li>
+        </ol>
+      </div>
+    </div>
+    <blockquote class="quote">&ldquo;It didn't make the call for us. It told us where to start, and why.&rdquo;<cite>ICU medical director, Northbridge Regional</cite></blockquote>
+    <p class="fineprint">Illustrative composite scenario: Northbridge Regional and all patients are fictional. The gains shown are what the pilot is designed to measure, not reported results.</p>
   </section>
 
   <section class="slide">
